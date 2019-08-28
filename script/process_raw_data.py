@@ -1,0 +1,207 @@
+#!/usr/bin/env python2
+
+import os, sys
+from pylib import *
+from multiprocessing.dummy import Pool as ThreadPool
+from functools import partial
+
+
+##global variables
+
+g_thread_context_dict = dict()
+g_method_dict = dict()
+
+
+def get_all_files(directory):
+	files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory,f))]
+	ret_dict = dict()
+	for f in files:
+		if f.startswith("agent-trace-") and f.find(".run") >= 0:
+			start_index = len("agent-trace-")
+			end_index = f.find(".run")
+			tid = f[start_index:end_index]
+			if tid not in ret_dict:
+				ret_dict[tid] = []
+			ret_dict[tid].append(os.path.join(directory,f))
+	return ret_dict	
+
+def parse_input_file(file_path, level_one_node_tag):
+	print "parsing", file_path
+	with open(file_path) as f:
+		contents = f.read()
+		#print contents
+	parser = special_xml.HomoXMLParser(level_one_node_tag, contents)
+	return parser.getVirtualRoot()
+
+def load_method(method_root):
+	method_manager = code_cache.MethodManager()
+	for m_xml in method_root.getChildren():
+		m = code_cache.Method(m_xml.getAttr("id"),m_xml.getAttr("version"))
+		## set fields
+		m.file = m_xml.getAttr("file")
+		m.start_addr = m_xml.getAttr("start_addr")
+		m.code_size = m_xml.getAttr("code_size")
+		m.method_name = m_xml.getAttr("name")
+		m.class_name = m_xml.getAttr("class")
+
+		## add children; currently addr2line mapping and bci2line mapping
+		addr2line_xml = None
+		bci2line_xml = None
+		for c_xml in m_xml.getChildren():
+			if c_xml.name() == "addr2line":
+				assert(not addr2line_xml)
+				addr2line_xml = c_xml
+			elif c_xml.name() == "bci2line":
+				assert(not bci2line_xml)
+				bci2line_xml = c_xml
+		if addr2line_xml:
+			for range_xml in addr2line_xml.getChildren():
+				assert(range_xml.name() == "range")
+				start = range_xml.getAttr("start")
+				end = range_xml.getAttr("end")
+				lineno = range_xml.getAttr("data")	
+
+				m.addAddr2Line((start,end),lineno)
+
+		if bci2line_xml:
+			for range_xml in bci2line_xml.getChildren():
+				assert(range_xml.name() == "range")
+				start = range_xml.getAttr("start")
+				end = range_xml.getAttr("end")
+				lineno = range_xml.getAttr("data")	
+
+				m.addBCI2Line((start,end),lineno)
+			
+		method_manager.addMethod(m)
+	return method_manager
+
+def load_context(context_root):
+	context_manager = context.ContextManager()
+	print "It has ", len(context_root.getChildren()), " contexts"
+	i = 0
+	for ctxt_xml in context_root.getChildren():
+		
+		ctxt = context.Context(ctxt_xml.getAttr("id"))
+		# set fields
+		ctxt.method_version = ctxt_xml.getAttr("method_version")
+		ctxt.binary_addr = ctxt_xml.getAttr("binary_addr")
+		ctxt.method_id = ctxt_xml.getAttr("method_id")
+		ctxt.bci = ctxt_xml.getAttr("bci")
+		ctxt.setParentID(ctxt_xml.getAttr("parent_id"))
+	    	
+		metrics_xml = None
+		for c_xml in ctxt_xml.getChildren():
+			if c_xml.name() == "metrics":
+				assert(not metrics_xml)
+				metrics_xml = c_xml
+		if metrics_xml:
+			for c_xml in metrics_xml.getChildren():
+				attr_dict = c_xml.getAttrDict()
+				id = attr_dict["id"]
+				if attr_dict.has_key("value1"):
+				    assert(not(attr_dict.has_key("value2")))
+				    ctxt.metrics_dict["value"] = attr_dict["value1"]
+				    ctxt.metrics_type = "INT"
+				if attr_dict.has_key("value2"):
+				    assert(not(attr_dict.has_key("value1")))
+				    ctxt.metrics_dict["value"] = attr_dict["value2"]
+				    ctxt.metrics_type = "FP"
+		
+		## add it to context manager
+		context_manager.addContext(ctxt)
+	roots = context_manager.getRoots()
+	print "remaining roots: ", str([r.id for r in roots])
+	assert(len(roots) == 1)
+	#len(context_manager.getRoots()) == 1)
+	context_manager.populateMetrics()
+	return context_manager
+
+def output_to_file(method_manager, context_manager, dump_data, dump_fp_data):
+	intpr = interpreter.Interpreter(method_manager, context_manager)
+	for ctxt_list in context_manager.getAllPaths("0", "root-leaf"):#"root-subnode"):
+		if ctxt_list[-1].metrics_dict:
+		    key = "\n".join(intpr.getSrcPosition(c) for c in ctxt_list)
+		    if ctxt_list[-1].metrics_type == "INT":
+				if dump_data.has_key(key):
+				    dump_data[key] += (ctxt_list[-1].metrics_dict["value"])
+				else:
+				    dump_data[key] = (ctxt_list[-1].metrics_dict["value"])
+		    elif ctxt_list[-1].metrics_type == "FP":
+				if dump_fp_data.has_key(key):
+				    dump_fp_data[key] += (ctxt_list[-1].metrics_dict["value"])
+				else:
+				    dump_fp_data[key] = (ctxt_list[-1].metrics_dict["value"])
+
+def main():
+	### read all agent trace files
+	tid_file_dict = get_all_files(".")
+
+	### each file may have two kinds of information
+	# 1. context; 2. code
+	# the code information should be shared global while the context information is on a per-thread basis.
+	xml_root_dict = dict()
+	for tid in tid_file_dict:
+		root = xml.XMLObj("root")
+		if tid == "method":
+			level_one_node_tag = "method"
+		else:
+			level_one_node_tag = "context"
+
+		for f in tid_file_dict[tid]:
+			new_root = parse_input_file(f, level_one_node_tag)
+			root.addChildren(new_root.getChildren())
+		if len(root.getChildren()) > 0:
+			xml_root_dict[tid] = root
+		
+	### reconstruct method
+	print("start to load methods")
+	method_root = xml_root_dict["method"]
+	method_manager = load_method(method_root)
+	print("Finished loading methods")
+		
+	print("Start to output")
+	dump_data = dict()
+	dump_fp_data = dict()
+
+	for tid in xml_root_dict:
+		if tid == "method":
+			continue
+		print("Reconstructing contexts from TID " + tid)
+		xml_root = xml_root_dict[tid]
+		print("Dumping contexts from TID "+tid)
+	 	output_to_file(method_manager, load_context(xml_root), dump_data, dump_fp_data)
+
+	result = []
+	file = open("agent-statistics", "r")
+	for line in file.readlines():
+		result.append(line)
+	file.close()
+	assert(len(result) == 3 or len(result) == 4)
+	deadOrRedBytes = long(result[1])
+
+	file = open("agent-data", "w")
+	if len(result) == 4 and float(result[2]) != 0.:
+		file.write("-----------------------Precise Redundancy------------------------------\n")
+
+	rows = sorted(dump_data.items(), key=lambda x: x[-1], reverse = True)
+	for row in rows:
+		file.write(row[0] + "\nRedundancy Fraction: " + str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+
+	if len(result) == 4 and float(result[3]) != 0.:
+		file.write("\n----------------------Approximate Redundancy---------------------------\n")
+
+		rows = sorted(dump_fp_data.items(), key=lambda x: x[-1], reverse = True)
+		for row in rows:
+		    file.write(row[0]  + "\nRedundancy Fraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+	
+	file.write("\nWritten/loaded Bytes: " + result[0])
+	file.write("Dead/Redundant Bytes: " + result[1])
+	file.write("Precise Deadness/Redundancy Ratio: " + str(round(float(result[2]) * 100, 2)) + "%\n")
+	if len(result) == 4:
+		file.write("Approximate Redundancy Ratio: " + str(round(float(result[3]) * 100, 2)) + "%\n")
+		file.write("Total Redundancy Ratio: " + str(round((float(result[2]) + float(result[3])) * 100, 2)) + "%")
+	file.close()
+ 
+	print("Final dumping")
+	
+main()

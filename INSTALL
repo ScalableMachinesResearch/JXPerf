@@ -1,0 +1,11 @@
+1. Installation Prerequisites
+  a. Install Oracle/OpenJDK 8 or its later.
+  b. cp set_env.template set_env
+  c. Modify set_env to make JXPerf_HOME and JAVA_HOME point to your JXPerf home and Java home.
+  d. source set_env
+
+2. Installation
+  a. make
+
+3. Uninstallation
+  a. make clean

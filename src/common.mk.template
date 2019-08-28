@@ -1,0 +1,11 @@
+#################################
+# Edit this part (if necessary) #
+#################################
+
+JAVA_HOME=/home/psu/tools/java/jdk10/install/jvm/openjdk-10-internal
+LIBPFM_INC=/home/psu/tools/java/libpfm-4.9.0/include
+LIBPFM_LIB=/home/psu/tools/java/libpfm-4.9.0/install/lib
+
+COMMON_FLAGS= -g -Wunused-but-set-variable  -m64 -O3 -fPIC
+#COMMON_FLAGS += -builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free #when compiling use tc_malloc natively
+
