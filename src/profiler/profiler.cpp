@@ -18,10 +18,9 @@
 #include "context-pc.h" 
 #include "safe-sampling.h"
 
-#define DEADSPY_CLIENT_NAME "DEADSPY"
-#define REDSPY_CLIENT_NAME "REDSPY"
-#define LOADSPY_CLIENT_NAME "LOADSPY"
-#define INEFFICSPY_CLIENT_NAME "INEFFICSPY"
+#define DEADSTORE_CLIENT_NAME "DEADSTORE"
+#define SILENTSTORE_CLIENT_NAME "SILENTSTORE"
+#define SILENTLOAD_CLIENT_NAME "SILENTLOAD"
 
 #define APPROX_RATE (0.01)
 #define MAX_FRAME_NUM (128)
@@ -159,13 +158,13 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
         WP_DisableAllWatchPoints();
         localGCCounter++;
     }
-    if (clientName.compare(DEADSPY_CLIENT_NAME) == 0 && accessType != LOAD) {
+    if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0 && accessType != LOAD) {
         totalWrittenBytes += accessLen * threshold;
         WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metricID, false);
-    } else if (clientName.compare(REDSPY_CLIENT_NAME) == 0 && accessType != LOAD) {
+    } else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0 && accessType != LOAD) {
         totalWrittenBytes += accessLen * threshold;
         WP_Subscribe(sampleAddr, watchLen, WP_WRITE, accessLen, watchCtxt, metricID, true);
-    } else if (clientName.compare(LOADSPY_CLIENT_NAME) == 0 && accessType != STORE) { 
+    } else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0 && accessType != STORE) { 
         totalLoadedBytes += accessLen * threshold;
         WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metricID, true);
     } else {
@@ -279,9 +278,9 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
     if (false == get_mem_access_length_and_type_address(wpt->pc, (uint32_t *)(&accessLen), &accessType, &floatType, wpt->uCtxt, &addr)) return WP_DISABLE;
     if (accessLen == 0) return WP_DISABLE;
     
-    if (clientName.compare(REDSPY_CLIENT_NAME) == 0) {
+    if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) {
         if (accessType == UNKNOWN) return WP_DISABLE;
-    } else if (clientName.compare(LOADSPY_CLIENT_NAME) == 0) {
+    } else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) {
         if (accessType == STORE) return WP_RETAIN;
         if (accessType == UNKNOWN) return WP_DISABLE;
     } else {
@@ -439,7 +438,7 @@ WP_TriggerAction_t Profiler::OnRedStoreWatchPoint(WP_TriggerInfo_t *wpt) {
         prevIP = patchedIP;
     }
     
-    WP_TriggerAction_t ret = DetectRedundancy(wpt, method_id, method_version, REDSPY_CLIENT_NAME);
+    WP_TriggerAction_t ret = DetectRedundancy(wpt, method_id, method_version, SILENTSTORE_CLIENT_NAME);
     profiler_safe_exit();
     return ret;
 }
@@ -478,7 +477,7 @@ WP_TriggerAction_t Profiler::OnRedLoadWatchPoint(WP_TriggerInfo_t *wpt) {
         prevIP = patchedIP;
     }
 
-    WP_TriggerAction_t ret = DetectRedundancy(wpt, method_id, method_version, LOADSPY_CLIENT_NAME);
+    WP_TriggerAction_t ret = DetectRedundancy(wpt, method_id, method_version, SILENTLOAD_CLIENT_NAME);
     profiler_safe_exit();
     return ret;
 }
@@ -518,14 +517,14 @@ void Profiler::shutdown() {
     
 
 #if 0    
-    if (clientName.compare(DEADSPY_CLIENT_NAME) == 0) {
+    if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0) {
         printf("Written bytes: %lu\n", grandTotWrittenBytes);
         printf("Dead bytes: %lu %.2f%%\n", grandTotDeadBytes,  grandTotDeadBytes * 100.0 / (grandTotDeadBytes + grandTotUsedBytes));
-    } else if (clientName.compare(REDSPY_CLIENT_NAME) == 0) {
+    } else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) {
         printf("Written bytes: %lu\n", grandTotWrittenBytes);
         printf("Redundant bytes: %lu %.2f%%\n", grandTotOldBytes,  grandTotOldBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
         printf("Approximate redundant bytes: %lu %.2f%%\n", grandTotOldAppxBytes,  grandTotOldAppxBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
-    } else if (clientName.compare(LOADSPY_CLIENT_NAME) == 0) {
+    } else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) {
         printf("Loaded bytes: %lu\n", grandTotLoadedBytes);
         printf("Redundant bytes: %lu %.2f%%\n", grandTotOldBytes,  grandTotOldBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
         printf("Approximate redundant bytes: %lu %.2f%%\n", grandTotOldAppxBytes,  grandTotOldAppxBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
@@ -563,9 +562,9 @@ void Profiler::threadStart() {
         TD_GET(pmu_ins_output_stream) = reinterpret_cast<void *>(pmu_ins_output_stream);
 #endif
     }
-     if (clientName.compare(DEADSPY_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnDeadStoreWatchPoint));
-     else if (clientName.compare(REDSPY_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedStoreWatchPoint));
-     else if (clientName.compare(LOADSPY_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedLoadWatchPoint));
+     if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnDeadStoreWatchPoint));
+     else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedStoreWatchPoint));
+     else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedLoadWatchPoint));
      else {
         ERROR("Can't decode client %s", clientName.c_str());
         assert(false);
@@ -657,16 +656,16 @@ int Profiler::output_method(const char *buf) {
 
 void Profiler::output_statistics() {
     
-    if (clientName.compare(DEADSPY_CLIENT_NAME) == 0) {
+    if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0) {
         _statistics_file << grandTotWrittenBytes << std::endl;
         _statistics_file << grandTotDeadBytes << std::endl; 
         _statistics_file << (double)grandTotDeadBytes / (grandTotDeadBytes + grandTotUsedBytes);
-    } else if (clientName.compare(REDSPY_CLIENT_NAME) == 0) {
+    } else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) {
         _statistics_file << grandTotWrittenBytes << std::endl;
         _statistics_file << grandTotOldBytes + grandTotOldAppxBytes << std::endl;
         _statistics_file << (double)grandTotOldBytes / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes) << std::endl;
         _statistics_file << (double)grandTotOldAppxBytes / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes);
-    } else if (clientName.compare(LOADSPY_CLIENT_NAME) == 0) {
+    } else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) {
         _statistics_file << grandTotLoadedBytes << std::endl;
         _statistics_file << grandTotOldBytes + grandTotOldAppxBytes << std::endl; 
         _statistics_file << (double)grandTotOldBytes / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes) << std::endl;

@@ -9,3 +9,13 @@
 
 3. Uninstallation
   a. make clean
+
+4. To run dead store detection
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=DeadStore::MEM_UOPS_RETIRED:ALL_STORES:precise=3@<sampling rate> -cp<classpath> <java_program>
+
+
+5. To run silent store detection
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentStore::MEM_UOPS_RETIRED:ALL_STORES:precise=3@<sampling rate> -cp<classpath> <java_program>
+
+6. To run silent load detection
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentLoad::MEM_UOPS_RETIRED:ALL_:LOADS:precise=3@<sampling rate> -cp<classpath> <java_program>
