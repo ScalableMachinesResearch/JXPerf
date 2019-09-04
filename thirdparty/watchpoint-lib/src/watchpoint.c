@@ -144,7 +144,7 @@ static void OnWatchPoint(int signum, siginfo_t *info, void *uCtxt) {
     }
 
     if(location == -1) {
-	    // if no existing WP is matched, just ignore and return
+	// if no existing WP is matched, just ignore and return
         // EMSG("\n thread %d WP trigger did not match any known active WP\n", gettid());
         // tData->insideSigHandler = false;
         return;
@@ -165,14 +165,18 @@ static void OnWatchPoint(int signum, siginfo_t *info, void *uCtxt) {
         .sampleValue = &(wpi->sampleValue[0]),
         .metricID = wpi->metricID
     };
-    
-    if (WP_CollectTriggerInfo(wpi, &wpt, uCtxt, wpConfig.pgsz)){
-    	retVal = tData->fptr(&wpt); // onWatchPoint() in profiler.c
-    } else {
-	// drop this sample
-	retVal = WP_DISABLE;
+   
+    if (wpConfig.isLBREnabled == false) {
+    	retVal = tData->fptr(&wpt); 
+    } else { 
+    	if (WP_CollectTriggerInfo(wpi, &wpt, uCtxt, wpConfig.pgsz)){
+    	    retVal = tData->fptr(&wpt); 
+    	} else {
+	    // drop this sample
+	    retVal = WP_DISABLE;
+    	}
     }
-
+    
     switch (retVal) {
         case WP_DISABLE: {
             if(wpi->isActive) {
@@ -427,7 +431,6 @@ bool WP_Init(){
     }
 
     volatile int dummyWP[MAX_WP_SLOTS];
-    wpConfig.isLBREnabled = true;
 
     struct perf_event_attr peLBR;
     memset(&peLBR, 0, sizeof(struct perf_event_attr));
@@ -446,7 +449,7 @@ bool WP_Init(){
 
     int fd =  perf_event_open(&peLBR, 0, -1, -1 /*group*/, 0);
     if (fd != -1) {
-        wpConfig.isLBREnabled = true;
+        wpConfig.isLBREnabled = false;
     } else {
         wpConfig.isLBREnabled = false;
     }

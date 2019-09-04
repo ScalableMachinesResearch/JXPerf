@@ -33,7 +33,6 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
     ContextTree *ctxt_tree = reinterpret_cast<ContextTree *> (TD_GET(context_state));
     Context *last_ctxt = ctxt;
 
-#ifdef ENABLE_CALL_PATH_COLLECTION
     ASGCT_CallFrame frames[MAX_FRAME_NUM];
     // ASGCT_CallTrace trace = {JVM::jni(), 0, frames};
     ASGCT_CallTrace trace;
@@ -48,7 +47,6 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
         if (last_ctxt == nullptr) last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxtframe);
         else last_ctxt = ctxt_tree->addContext(last_ctxt, ctxtframe);
     }
-#endif
 
     // leaf node 
     ContextFrame ctxtframe;
@@ -175,7 +173,8 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
 
 WP_TriggerAction_t Profiler::OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpt) {
     if (!profiler_safe_enter()) return WP_DISABLE;
-    // if (!IsValidPC(wpt->pc)) {
+
+    if (wpt->pc == 0) wpt->pc = getContextPC(wpt->uCtxt);
     if (wpt->pc == 0) {
         profiler_safe_exit();
         return WP_DISABLE; 
@@ -407,6 +406,8 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
 
 WP_TriggerAction_t Profiler::OnRedStoreWatchPoint(WP_TriggerInfo_t *wpt) {
     if (!profiler_safe_enter()) return WP_DISABLE;
+    
+    if (wpt->pc == 0) wpt->pc = getContextPC(wpt->uCtxt);
     if (wpt->pc == 0) {
         profiler_safe_exit();
         return WP_DISABLE; 
@@ -446,6 +447,8 @@ WP_TriggerAction_t Profiler::OnRedStoreWatchPoint(WP_TriggerInfo_t *wpt) {
 
 WP_TriggerAction_t Profiler::OnRedLoadWatchPoint(WP_TriggerInfo_t *wpt) {
     if (!profiler_safe_enter()) return WP_DISABLE;
+    
+    if (wpt->pc == 0) wpt->pc = getContextPC(wpt->uCtxt);
     if (wpt->pc == 0) {
         profiler_safe_exit();
         return WP_DISABLE; 
