@@ -24,7 +24,6 @@ class Interpreter:
 				method_name = method.method_name
 				source_file = method.file
 				source_lineno = method.addr2line(context.binary_addr)
-				ip = None # option: merge the same context but with different IPs
 			else:
 				class_name, method_name, source_file, source_lineno = None, None, None, None
 
@@ -40,18 +39,6 @@ class Interpreter:
 			else:
 				method_name, class_name, source_file, source_lineno, ip = None, None, None, None, None
 
-#			parent_context = self._context_manager.getParent(context)
-#			if parent_context:
-#				method = self._method_manager.getMethod(parent_context.method_id, parent_context.method_version)
-#			else:
-#				method = None
-#			if method:
-#				class_name = method.class_name
-#				source_file = method.file
-#				source_lineno = method.bci2line(context.bci)
-#			else:
-#				class_name, source_file, source_lineno = None, None, None
-			
 		if class_name == None or len(class_name) == 0:
 			class_name = "??"
 
@@ -68,15 +55,12 @@ class Interpreter:
 		else:
 			ip = hex(int(ip))
 
-#		if ip == None:
-#			ip = ""
-#		else:
-#			ip = "," + ip
-		
 
 		if context.bci == "-65536" and style == None:
-			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + " " + ip + ")" "\n*********************************REDUNDANT WITH*********************************"
-		elif class_name == "Root": 
+			return "*********************************REDUNDANT WITH*********************************"
+		elif class_name == "Root" or ip != "":
+			return ""
+		elif ip != "":
 			return ""
 		else:
-			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + " " + ip + ")"
+			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + ")"

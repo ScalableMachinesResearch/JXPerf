@@ -194,12 +194,12 @@ def main():
 		for row in rows:
 		    file.write(row[0]  + "\nRedundancy Fraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
 	
-	file.write("\nWritten/loaded Bytes: " + result[0])
-	file.write("Dead/Redundant Bytes: " + result[1])
-	file.write("Precise Deadness/Redundancy Ratio: " + str(round(float(result[2]) * 100, 2)) + "%\n")
+	file.write("\nTotal Bytes: " + result[0])
+	file.write("Total Redundant Bytes: " + result[1])
 	if len(result) == 4:
-		file.write("Approximate Redundancy Ratio: " + str(round(float(result[3]) * 100, 2)) + "%\n")
-		file.write("Total Redundancy Ratio: " + str(round((float(result[2]) + float(result[3])) * 100, 2)) + "%")
+		file.write("Total Redundancy Fraction: " + str(round((float(result[2]) + float(result[3])) * 100, 2)) + "%")
+	else:
+		file.write("Total Redundancy Fraction: " + str(round(float(result[2]) * 100, 2)) + "%")
 	file.close()
  
 	print("Final dumping")
