@@ -14,7 +14,7 @@ static uint32_t page_mask = 0;
 
 
 //-------------private operationis----------------------//
-static void perf_skip_buffer_nbytes( perf_mmap_t *mmap_buf, size_t n){
+static void perf_skip_buffer_nbytes(perf_mmap_t *mmap_buf, size_t n){
     uint64_t data_head = mmap_buf->data_head;
     __sync_synchronize();
     if ((mmap_buf->data_tail + n) > data_head)
@@ -23,7 +23,7 @@ static void perf_skip_buffer_nbytes( perf_mmap_t *mmap_buf, size_t n){
 }
 
 /* return val: 0, success; -1, error; 1, not enough data */
-static int perf_read_buffer_nbytes( perf_mmap_t *mmap_buf, void *buf /*output*/, size_t n){ 
+static int perf_read_buffer_nbytes(perf_mmap_t *mmap_buf, void *buf /*output*/, size_t n){ 
     if (mmap_buf == nullptr)
         return -1;
 
@@ -56,7 +56,7 @@ static int perf_read_buffer_nbytes( perf_mmap_t *mmap_buf, void *buf /*output*/,
         memcpy((char *)buf + right, data, left);
     }
 
-    // update tail after consuming bytes_wanted
+    // update tail after consuming n bytes
     mmap_buf->data_tail += n;
 
     return 0;
