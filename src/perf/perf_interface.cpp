@@ -290,7 +290,7 @@ void perf_event_handler(int sig, siginfo_t* siginfo, void* context){
             break;
         }
         assert(perf_read_header(current->mmap_buf, &ehdr));
-	    if (ehdr.type == PERF_RECORD_SAMPLE) {
+	if (ehdr.type == PERF_RECORD_SAMPLE) {
             perf_sample_data_t sample_data;
             memset(&sample_data, 0, sizeof(perf_sample_data_t));
 	        sample_data.isPrecise = (ehdr.misc & PERF_RECORD_MISC_EXACT_IP) ? true : false;
