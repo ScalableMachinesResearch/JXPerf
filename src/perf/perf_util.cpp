@@ -48,7 +48,7 @@ bool perf_attr_init(struct perf_event_attr *attr, uint64_t threshold, uint64_t m
         attr->read_format = 0;
     }
     attr->disabled = 1; /* the counter will be enabled later  */
-    //attr->wakeup_events = 1; // seems it doesn't really matter
+    attr->wakeup_events = 1;  /* overflow notifications happen after wakeup_events samples */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)
     attr->exclude_callchain_user   = EXCLUDE_CALLCHAIN;
