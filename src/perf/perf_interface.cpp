@@ -124,7 +124,6 @@ bool process_event_list(const std::vector<std::string> &event_list){
             current_event_info.threshold = std::stoull(sample_rate_str, nullptr, 10);
             std::string sample_precise_level = event.substr(pos2-1, 1);
             current_event_info.attr.precise_ip = std::stoull(sample_precise_level, nullptr, 10);
-            assert(current_event_info.attr.precise_ip = 3);
         } else {
             current_event_info.name = event;
             current_event_info.attr.precise_ip = 3;
