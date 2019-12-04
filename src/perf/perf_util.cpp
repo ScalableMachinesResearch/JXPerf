@@ -70,7 +70,7 @@ bool perf_read_event_counter(int fd, uint64_t *val){
     }
     int ret = read(fd, val, sizeof(uint64_t) * 3 );
     if (ret < sizeof(uint64_t)*3) {
-        ERROR("Error: unable to read event %d", current->event->id);
+        ERROR("Unable to read the event %d file descriptor", fd);
         return false;
     }
     return true;
