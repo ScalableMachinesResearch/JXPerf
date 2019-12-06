@@ -177,7 +177,7 @@ def main():
 		result.append(line)
 	file.close()
 
-	if not result:
+	if result:
 		assert(len(result) == 3 or len(result) == 4)
 		deadOrRedBytes = long(result[1])
 
