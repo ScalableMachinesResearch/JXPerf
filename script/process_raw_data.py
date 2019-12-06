@@ -176,31 +176,33 @@ def main():
 	for line in file.readlines():
 		result.append(line)
 	file.close()
-	assert(len(result) == 3 or len(result) == 4)
-	deadOrRedBytes = long(result[1])
 
-	file = open("agent-data", "w")
-	if len(result) == 4 and float(result[2]) != 0.:
-		file.write("-----------------------Precise Redundancy------------------------------\n")
+	if not result:
+		assert(len(result) == 3 or len(result) == 4)
+		deadOrRedBytes = long(result[1])
 
-	rows = sorted(dump_data.items(), key=lambda x: x[-1], reverse = True)
-	for row in rows:
-		file.write(row[0] + "\nRedundancy Fraction: " + str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+		file = open("agent-data", "w")
+		if len(result) == 4 and float(result[2]) != 0.:
+			file.write("-----------------------Precise Redundancy------------------------------\n")
 
-	if len(result) == 4 and float(result[3]) != 0.:
-		file.write("\n----------------------Approximate Redundancy---------------------------\n")
-
-		rows = sorted(dump_fp_data.items(), key=lambda x: x[-1], reverse = True)
+		rows = sorted(dump_data.items(), key=lambda x: x[-1], reverse = True)
 		for row in rows:
-		    file.write(row[0]  + "\nRedundancy Fraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+			file.write(row[0] + "\nRedundancy Fraction: " + str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+
+		if len(result) == 4 and float(result[3]) != 0.:
+			file.write("\n----------------------Approximate Redundancy---------------------------\n")
+
+			rows = sorted(dump_fp_data.items(), key=lambda x: x[-1], reverse = True)
+			for row in rows:
+		    	file.write(row[0]  + "\nRedundancy Fraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
 	
-	file.write("\nTotal Bytes: " + result[0])
-	file.write("Total Redundant Bytes: " + result[1])
-	if len(result) == 4:
-		file.write("Total Redundancy Fraction: " + str(round((float(result[2]) + float(result[3])) * 100, 2)) + "%")
-	else:
-		file.write("Total Redundancy Fraction: " + str(round(float(result[2]) * 100, 2)) + "%")
-	file.close()
+		file.write("\nTotal Bytes: " + result[0])
+		file.write("Total Redundant Bytes: " + result[1])
+		if len(result) == 4:
+			file.write("Total Redundancy Fraction: " + str(round((float(result[2]) + float(result[3])) * 100, 2)) + "%")
+		else:
+			file.write("Total Redundancy Fraction: " + str(round(float(result[2]) * 100, 2)) + "%")
+		file.close()
  
 	print("Final dumping")
 	
