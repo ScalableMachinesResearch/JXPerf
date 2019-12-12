@@ -194,7 +194,7 @@ def main():
 
 			rows = sorted(dump_fp_data.items(), key=lambda x: x[-1], reverse = True)
 			for row in rows:
-		    	file.write(row[0]  + "\nRedundancy Fraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+				file.write(row[0]  + "\nRedundancy Fraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
 	
 		file.write("\nTotal Bytes: " + result[0])
 		file.write("Total Redundant Bytes: " + result[1])

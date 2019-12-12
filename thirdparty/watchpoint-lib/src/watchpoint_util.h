@@ -22,10 +22,6 @@
 
 //********************MACRO*************************************/
 #define MAX_WP_LENGTH (8L)
-
-// #define MAX_WP_SLOTS (1)
-// #define MAX_WP_SLOTS (2)
-// #define MAX_WP_SLOTS (3)
 #define MAX_WP_SLOTS (5)
 
 #define CACHE_LINE_SZ (64)
@@ -37,13 +33,11 @@
 #define EMSG(...) fprintf(stderr, __VA_ARGS__)
 #define TD_GET()   ((WP_ThreadData_t *) pthread_getspecific(WP_ThreadData_key))
 
-#if 0
 #if defined(PERF_EVENT_IOC_UPDATE_BREAKPOINT)
 #define FAST_BP_IOC_FLAG (PERF_EVENT_IOC_UPDATE_BREAKPOINT)
 #elif defined(PERF_EVENT_IOC_MODIFY_ATTRIBUTES)
 #define FAST_BP_IOC_FLAG (PERF_EVENT_IOC_MODIFY_ATTRIBUTES)
 #else
-#endif
 #endif
 
 #define CHECK(x) ({int err = (x); \

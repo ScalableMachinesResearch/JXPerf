@@ -259,11 +259,11 @@ static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t w
         // modification
         assert(wpi->fileHandle != -1);
         assert(wpi->mmapBuffer != 0);
-        DisableWatchpoint(wpi);
+        // DisableWatchpoint(wpi);
         CHECK(ioctl(wpi->fileHandle, FAST_BP_IOC_FLAG, (unsigned long) (&pe)));
-        if(wpi->isActive == false) {
-            EnableWatchpoint(wpi->fileHandle);
-        }
+        // if(wpi->isActive == false) {
+        //    EnableWatchpoint(wpi->fileHandle);
+        // }
     } else
 #endif
     {
@@ -431,6 +431,7 @@ bool WP_Init(){
     }
 
     volatile int dummyWP[MAX_WP_SLOTS];
+    wpConfig.isLBREnabled = true;    
 
     struct perf_event_attr peLBR;
     memset(&peLBR, 0, sizeof(struct perf_event_attr));
@@ -449,7 +450,7 @@ bool WP_Init(){
 
     int fd =  perf_event_open(&peLBR, 0, -1, -1 /*group*/, 0);
     if (fd != -1) {
-        wpConfig.isLBREnabled = false;
+        wpConfig.isLBREnabled = true;
     } else {
         wpConfig.isLBREnabled = false;
     }
