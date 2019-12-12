@@ -431,7 +431,6 @@ bool WP_Init(){
     }
 
     volatile int dummyWP[MAX_WP_SLOTS];
-    wpConfig.isLBREnabled = true;    
 
     struct perf_event_attr peLBR;
     memset(&peLBR, 0, sizeof(struct perf_event_attr));
