@@ -28,7 +28,7 @@ class Interpreter:
 				class_name, method_name, source_file, source_lineno = None, None, None, None
 
 
-		else: ### middle node
+		else: ## middle node
 			method = self._method_manager.getMethod(context.method_id, context.method_version)
 			if method:
 				method_name = method.method_name
@@ -58,7 +58,7 @@ class Interpreter:
 
 		if context.bci == "-65536" and style == None:
 			return "*********************************REDUNDANT WITH*********************************"
-		elif class_name == "Root" or ip != "":
+		elif class_name == "Root":
 			return ""
 		elif ip != "":
 			return ""
