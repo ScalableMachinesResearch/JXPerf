@@ -93,7 +93,6 @@ static inline void DisableWatchpoint(WP_RegisterInfo_t *wpi) {
 }
 
 static void DisArm(WP_RegisterInfo_t * wpi) {
-    // assert(wpi->isActive);
     assert(wpi->fileHandle != -1);
 
     if(wpi->mmapBuffer) {
@@ -107,9 +106,9 @@ static void DisArm(WP_RegisterInfo_t * wpi) {
 }
 
 void DisableWatchpointWrapper(WP_RegisterInfo_t *wpi){
-    if(wpConfig.isWPModifyEnabled) {
+    if(wpConfig.isWPModifyEnabled && wpi->isActive) {
         DisableWatchpoint(wpi);
-    } else {
+    } else if (!wpConfig.isWPModifyEnabled && wpi->fileHandle != -1) {
         DisArm(wpi);
     }
 }
@@ -153,7 +152,7 @@ static void OnWatchPoint(int signum, siginfo_t *info, void *uCtxt) {
 
     WP_TriggerAction_t retVal;
     WP_RegisterInfo_t *wpi = &tData->watchPointArray[location];
-    DisableWatchpointWrapper(wpi);
+    DisableWatchpoint(wpi);
 
     WP_TriggerInfo_t wpt = {
         .va = wpi->va,
@@ -180,18 +179,14 @@ static void OnWatchPoint(int signum, siginfo_t *info, void *uCtxt) {
     
     switch (retVal) {
         case WP_DISABLE: {
-            if(wpi->isActive) {
-                DisableWatchpointWrapper(wpi);
-            }
+	    DisableWatchpointWrapper(wpi);
             // Reset per WP probability
             wpi->samplePostFull = SAMPLES_POST_FULL_RESET_VAL;
         }
         break;
         case WP_DISABLE_ALL: {
             for(int i = 0; i < wpConfig.maxWP; i++) {
-                if(tData->watchPointArray[i].isActive){
-                    DisableWatchpointWrapper(&(tData->watchPointArray[i]));
-                }
+                DisableWatchpointWrapper(&(tData->watchPointArray[i]));
                 // Reset per WP probability
                 tData->watchPointArray[i].samplePostFull = SAMPLES_POST_FULL_RESET_VAL;
             }
@@ -260,11 +255,11 @@ static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t w
         // modification
         assert(wpi->fileHandle != -1);
         assert(wpi->mmapBuffer != 0);
-        // DisableWatchpoint(wpi);
+        DisableWatchpoint(wpi);
         CHECK(ioctl(wpi->fileHandle, FAST_BP_IOC_FLAG, (unsigned long) (&pe)));
-        // if(wpi->isActive == false) {
-        //    EnableWatchpoint(wpi->fileHandle);
-        // }
+        if (!wpi->isActive) {
+		EnableWatchpoint(wpi->fileHandle);
+	}
     } else
 #endif
     {
@@ -519,7 +514,6 @@ bool WP_Init(){
         CHECK(close(wpHandles[j]));
     }
     wpConfig.maxWP = i;
-    // printf("i=%d", i);
     wpConfig.replacementPolicy = WP_REPLACEMENT_AUTO;
     wpConfig.userPerfPause = NULL;
     wpConfig.userPerfResume = NULL;
