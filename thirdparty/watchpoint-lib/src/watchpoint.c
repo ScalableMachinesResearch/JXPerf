@@ -294,8 +294,10 @@ static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t w
         // mmap the file if lbr is enabled
         if(wpConfig.isLBREnabled) {
             wpi->mmapBuffer = WP_MapBuffer(perf_fd, wpConfig.pgsz);
-        }
-    }
+        } else {
+	    wpi->mmapBuffer = 0;
+	}
+    } 
 
     wpi->isActive = true;
     wpi->va = (void *)pe.bp_addr;
@@ -432,6 +434,7 @@ bool WP_Init(){
 
     volatile int dummyWP[MAX_WP_SLOTS];
 
+#if defined(FAST_BP_IOC_FLAG)
     struct perf_event_attr peLBR;
     memset(&peLBR, 0, sizeof(struct perf_event_attr));
     peLBR.type                   = PERF_TYPE_BREAKPOINT;
@@ -454,9 +457,10 @@ bool WP_Init(){
         wpConfig.isLBREnabled = false;
     }
     CHECK(close(fd));
-#if defined(FAST_BP_IOC_FLAG)
+    
     wpConfig.isWPModifyEnabled = true;
 #else
+    wpConfig.isLBREnabled = false;
     wpConfig.isWPModifyEnabled = false;
 #endif
     wpConfig.signalDelivered = SIGTRAP;
