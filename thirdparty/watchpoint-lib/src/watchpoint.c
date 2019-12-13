@@ -223,11 +223,11 @@ static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t w
     memset(&pe, 0, sizeof(struct perf_event_attr));
     pe.type                   = PERF_TYPE_BREAKPOINT;
     pe.size                   = sizeof(struct perf_event_attr);
-    // .bp_type               = HW_BREAKPOINT_W,
-    // .bp_len                = HW_BREAKPOINT_LEN_4,
+    // pe.bp_type               = HW_BREAKPOINT_W,
+    // pe.bp_len                = HW_BREAKPOINT_LEN_4,
     pe.sample_period          = 1;
     pe.sample_type            = (PERF_SAMPLE_IP );
-    //pe.branch_sample_type = (PERF_SAMPLE_BRANCH_ANY);
+    // pe.branch_sample_type = (PERF_SAMPLE_BRANCH_ANY);
     pe.disabled               = 0; /* enabled */
     pe.exclude_user           = 0;
     pe.exclude_kernel         = 1;
@@ -255,10 +255,10 @@ static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t w
         // modification
         assert(wpi->fileHandle != -1);
         assert(wpi->mmapBuffer != 0);
-        DisableWatchpoint(wpi);
+        // DisableWatchpoint(wpi);
         CHECK(ioctl(wpi->fileHandle, FAST_BP_IOC_FLAG, (unsigned long) (&pe)));
         if (!wpi->isActive) {
-		EnableWatchpoint(wpi->fileHandle);
+	    EnableWatchpoint(wpi->fileHandle);
 	}
     } else
 #endif
