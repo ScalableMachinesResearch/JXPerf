@@ -498,7 +498,7 @@ void Profiler::init() {
     _method_file << XML_FILE_HEADER << std::endl;
 #endif
 
-    _statistics_file.open("agent-statistics");
+    _statistics_file.open("agent-statistics.run");
     ThreadData::thread_data_init();
     assert(PerfManager::processInit(JVM::getArgument()->getPerfEventList(), Profiler::OnSample));
     assert(WP_Init());

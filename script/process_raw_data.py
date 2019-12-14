@@ -38,7 +38,7 @@ def remove_all_files(directory):
 	for f in files:
 		if f.startswith("agent-trace-") and f.find(".run") >= 0:
 			os.remove(f)
-		elif f.startswith("agent-statistics") and f.endswith("agent-statistics"):
+		elif f.startswith("agent-statistics") and f.find(".run"):
 			os.remove(f)
 
 def load_method(method_root):
@@ -180,7 +180,7 @@ def main():
 	 	output_to_file(method_manager, load_context(xml_root), dump_data, dump_fp_data)
 
 	result = []
-	file = open("agent-statistics", "r")
+	file = open("agent-statistics.run", "r")
 	for line in file.readlines():
 		result.append(line)
 	file.close()
