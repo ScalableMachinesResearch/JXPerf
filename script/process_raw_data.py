@@ -33,6 +33,14 @@ def parse_input_file(file_path, level_one_node_tag):
 	parser = special_xml.HomoXMLParser(level_one_node_tag, contents)
 	return parser.getVirtualRoot()
 
+def remove_all_files(directory):
+	files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory,f))]
+	for f in files:
+		if f.startswith("agent-trace-") and f.find(".run") >= 0:
+			os.remove(f)
+		elif f.startswith("agent-statistics") and f.endswith("agent-statistics"):
+			os.remove(f)
+
 def load_method(method_root):
 	method_manager = code_cache.MethodManager()
 	for m_xml in method_root.getChildren():
@@ -203,7 +211,9 @@ def main():
 		else:
 			file.write("Total Redundancy Fraction: " + str(round(float(result[2]) * 100, 2)) + "%")
 		file.close()
- 
+	
 	print("Final dumping")
+	
+	remove_all_files(".") 
 	
 main()
