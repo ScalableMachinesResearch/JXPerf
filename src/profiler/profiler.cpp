@@ -541,6 +541,14 @@ void Profiler::IncrementGCCouter() {
 }
 
 void Profiler::threadStart() {
+    totalWrittenBytes = 0;
+    totalLoadedBytes = 0;
+    totalUsedBytes = 0;
+    totalDeadBytes = 0;
+    totalNewBytes = 0;
+    totalOldBytes = 0;
+    totalOldAppxBytes = 0;
+
     ThreadData::thread_data_alloc();
     ContextTree *ct_tree = new(std::nothrow) ContextTree();
     assert(ct_tree);
@@ -640,7 +648,7 @@ void Profiler::threadEnd() {
     }
 
     ThreadData::thread_data_dealloc();
-    
+
     __sync_fetch_and_add(&grandTotWrittenBytes, totalWrittenBytes);
     __sync_fetch_and_add(&grandTotLoadedBytes, totalLoadedBytes);
     __sync_fetch_and_add(&grandTotUsedBytes, totalUsedBytes);
@@ -648,6 +656,7 @@ void Profiler::threadEnd() {
     __sync_fetch_and_add(&grandTotNewBytes, totalNewBytes);
     __sync_fetch_and_add(&grandTotOldBytes, totalOldBytes);
     __sync_fetch_and_add(&grandTotOldAppxBytes, totalOldAppxBytes);
+    printf("%lu %lu\n", grandTotOldBytes, grandTotLoadedBytes);
 }
 
 
