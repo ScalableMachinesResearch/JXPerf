@@ -12,11 +12,16 @@
 
 4. To run dead store detection
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=DeadStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java_program>
+  b. $JXPerf_HOME/process_raw_data.py
+    1) A dump file named "agent-data" would be generated
 
 5. To run silent store detection
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java_program>
   b. $JXPerf_HOME/process_raw_data.py
+    1) A dump file named "agent-data" would be generated
 
 6. To run silent load detection
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentLoad::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java_program>
   b. $JXPerf_HOME/process_raw_data.py
+    1) A dump file named "agent-data" would be generated 
+
