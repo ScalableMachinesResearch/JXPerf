@@ -656,7 +656,6 @@ void Profiler::threadEnd() {
     __sync_fetch_and_add(&grandTotNewBytes, totalNewBytes);
     __sync_fetch_and_add(&grandTotOldBytes, totalOldBytes);
     __sync_fetch_and_add(&grandTotOldAppxBytes, totalOldAppxBytes);
-    printf("%lu %lu\n", grandTotOldBytes, grandTotLoadedBytes);
 }
 
 
