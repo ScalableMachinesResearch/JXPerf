@@ -97,7 +97,7 @@ static void DisArm(WP_RegisterInfo_t * wpi) {
 
     if(wpi->mmapBuffer) {
         WP_UnmapBuffer(wpi->mmapBuffer, wpConfig.pgsz);
-    	wpi->mmapBuffer = 0;
+	wpi->mmapBuffer = 0;
     }
 
     CHECK(close(wpi->fileHandle));
