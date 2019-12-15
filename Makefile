@@ -9,6 +9,7 @@ thirdparty:
 	cd thirdparty/libpfm-4.10.1 &&  make PREFIX=$(CURRENT_DIR)/build/thirdparty install
 	cd thirdparty/boost_1_71_0 && sh ./bootstrap.sh --prefix=$(CURRENT_DIR)/build/thirdparty --with-libraries="filesystem"  cxxflags="-std=c++11" && ./b2 -j 4 && ./b2 filesystem install 
 	cd thirdparty/bintrees-2.0.7 &&  python setup.py install --user
+	cd thirdparty/modified_allocation_callback && mvn
 	cd src && make 
 	cd preload && make 
 
@@ -17,4 +18,5 @@ clean:
 	make -C preload clean
 	make -C thirdparty/watchpoint-lib clean
 	make -C thirdparty/libpfm-4.10.1 clean
+	mvn -f thirdparty/modified_allocation_callback/pom.xml clean
 	rm -rf build

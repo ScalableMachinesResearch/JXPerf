@@ -1,3 +1,4 @@
 export JXPerf_HOME=<your JXPerf home>
 export JAVA_HOME=<your Java home>
 export PATH=$JAVA_HOME/bin:$PATH
+export JAVA_AGENT=$JXPerf_HOME/thirdparty/modified_allocation_callback/target/java-allocation-instrumenter-3.1.0.jar
