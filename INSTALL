@@ -29,7 +29,8 @@
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=DataCentric::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate> -cp <classpath> <java_program>
   b. $JXPerf_HOME/process_raw_data.py
     1) Two dump files named "agent-allocation" and "agent-cachemiss" would be generated
-      a) agent-allocation file shows the allocation times for every allocation site calling context
-      b) agent-cachemiss file shows the L1 cache misses for the data accessed calling context associated with its allocation site calling context
-      c) Detect high cache miss data: Check the agent-cachemiss file to identify which data incurs high L1 cache miss.
-      d) Detect memory bloat: First, check the agent-cachemiss file to identify the data suffering from high L1 cache miss (using the allocation site calling context). Second, check the agent-allocation file to see whether these problematic data have high allocation times. 
+      a) agent-allocation file reports allocation times for every allocation site
+      b) agent-cachemiss file reports pairs of calling context (i.e., <allocation site, access site>) for data incurring L1 cache misses in descending order
+      c) To analyze memory bloat
+        (1) Check the agent-cachemiss file to identify the data suffering from high L1 cache misses 
+	(2) Check the agent-allocation file to see whether these problematic data have high allocation times
