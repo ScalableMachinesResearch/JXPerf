@@ -32,5 +32,5 @@
       a) agent-allocation file reports allocation times for every allocation site
       b) agent-cachemiss file reports pairs of calling context (i.e., <allocation site, access site>) for data incurring L1 cache misses in descending order
       c) To analyze memory bloat
-        (1) Check the agent-cachemiss file to identify the data suffering from high L1 cache misses 
+        (1) Check the agent-cachemiss file to identify the data suffering from high L1 cache misses
 	(2) Check the agent-allocation file to see whether these problematic data have high allocation times
