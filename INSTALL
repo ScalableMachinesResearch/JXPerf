@@ -11,26 +11,26 @@
   a. make clean
 
 4. To run dead store detection
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=DeadStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java_program>
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=DeadStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java program>
   b. $JXPerf_HOME/process_raw_data.py
     1) A dump file named "agent-data" would be generated
 
 5. To run silent store detection
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java_program>
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java program>
   b. $JXPerf_HOME/process_raw_data.py
     1) A dump file named "agent-data" would be generated
 
 6. To run silent load detection
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentLoad::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java_program>
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentLoad::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java program>
   b. $JXPerf_HOME/process_raw_data.py
     1) A dump file named "agent-data" would be generated
 
 7. To run data centric analysis
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=DataCentric::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate> -cp <classpath> <java_program>
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=DataCentric::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate> -cp <classpath> <java program>
   b. $JXPerf_HOME/process_raw_data.py
     1) Two dump files named "agent-allocation" and "agent-cachemiss" would be generated
-      a) agent-allocation file reports allocation times for every allocation site
-      b) agent-cachemiss file reports pairs of calling context (i.e., <allocation site, access site>) for data incurring L1 cache misses in descending order
+      a) The agent-allocation file reports allocation times for every allocation site
+      b) The agent-cachemiss file reports pairs of calling context (i.e., <allocation site, access site>) for data incurring L1 cache misses in descending order
       c) To analyze memory bloat
         (1) Check the agent-cachemiss file to identify the data suffering from high L1 cache misses
 	(2) Check the agent-allocation file to see whether these problematic data have high allocation times
