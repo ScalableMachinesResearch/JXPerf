@@ -36,7 +36,6 @@ static SpinLock lock_map;
 static interval_tree_node *splay_tree_root = NULL;
 static std::unordered_map<Context*, Context*> map = {};
 
-
 uint64_t GCCounter = 0;
 __thread uint64_t localGCCounter = 0;
 

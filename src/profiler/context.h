@@ -44,7 +44,6 @@ public:
   inline Context *getParent() {return _parent;}
   inline bool isTriggered() {return _triggered;}
   inline void setTriggered() {_triggered = true;}
-  uint32_t _id;
 
 private:
   Context(uint32_t id);
@@ -61,7 +60,7 @@ private:
       a->_frame.method_version == b->_frame.method_version;
   }
 
-  // uint32_t _id;
+  uint32_t _id;
   bool _triggered = false;
   ContextFrame _frame;
   metrics::ContextMetrics *_metrics = nullptr; 
