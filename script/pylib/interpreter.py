@@ -9,7 +9,7 @@ class Interpreter:
 		self._method_manager = method_manager
 		self._context_manager = context_manager
 
-	def getSrcPosition(self, context, style=None):
+	def getSrcPosition(self, context, isDataCentric=False):
 		## include [method name], [source file] and [source lineno]
 		## the source_file and source_lineno should indicate where the method is called.. I mean it is related to the parent
 		
@@ -56,11 +56,13 @@ class Interpreter:
 			ip = hex(int(ip))
 
 
-		if context.bci == "-65536" and style == None:
+		if context.bci == "-65536" and isDataCentric:
+			return "*********************************USED BY*********************************"
+		elif context.bci == "-65536":
 			return "*********************************REDUNDANT WITH*********************************"
 		elif class_name == "Root":
 			return ""
-		elif ip != "":
-			return ""
+		#elif ip != "":
+			#return ""
 		else:
 			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + ")"

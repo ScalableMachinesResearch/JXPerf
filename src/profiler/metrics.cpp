@@ -53,8 +53,8 @@ XMLObj *createXMLObj(ContextMetrics * instance) {
     for (uint32_t i = 0; i < instance->_val_list.size(); i++) {
         metric_val_t &metric_val = (instance->_val_list)[i];
         
-        int min_red_byte = MetricInfoManager::getMetricInfo(i)->threshold * 10;
-        // int min_red_byte = MetricInfoManager::getMetricInfo(i)->threshold;
+        // int min_red_byte = MetricInfoManager::getMetricInfo(i)->threshold * 10;
+        int min_red_byte = 0; // MetricInfoManager::getMetricInfo(i)->threshold;
         if (metric_val.i >= min_red_byte || metric_val.r >= min_red_byte) isLargeRedundancy = true;
         
         XMLObj *child_obj = new(std::nothrow) XMLObj("metric");
@@ -74,6 +74,7 @@ XMLObj *createXMLObj(ContextMetrics * instance) {
         obj->addChild(i, child_obj);
     }
 #undef SET_ATTR
+
     if (!isLargeRedundancy) {
         delete obj;
         obj = nullptr;

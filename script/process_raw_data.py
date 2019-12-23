@@ -7,6 +7,7 @@ from functools import partial
 
 
 ##global variables
+isDataCentric = False
 
 g_thread_context_dict = dict()
 g_method_dict = dict()
@@ -86,7 +87,6 @@ def load_method(method_root):
 def load_context(context_root):
 	context_manager = context.ContextManager()
 	print "It has ", len(context_root.getChildren()), " contexts"
-	i = 0
 	for ctxt_xml in context_root.getChildren():
 		
 		ctxt = context.Context(ctxt_xml.getAttr("id"))
@@ -106,41 +106,78 @@ def load_context(context_root):
 			for c_xml in metrics_xml.getChildren():
 				attr_dict = c_xml.getAttrDict()
 				id = attr_dict["id"]
-				if attr_dict.has_key("value1"):
-				    assert(not(attr_dict.has_key("value2")))
-				    ctxt.metrics_dict["value"] = attr_dict["value1"]
-				    ctxt.metrics_type = "INT"
-				if attr_dict.has_key("value2"):
-				    assert(not(attr_dict.has_key("value1")))
-				    ctxt.metrics_dict["value"] = attr_dict["value2"]
-				    ctxt.metrics_type = "FP"
+				if isDataCentric:
+					if id == "0" and attr_dict.has_key("value1"):
+				    		ctxt.metrics_dict["value"] = attr_dict["value1"]
+				    		ctxt.metrics_type = "ALLOCTIMES"
+					elif id == "1"and attr_dict.has_key("value1"):
+				    		ctxt.metrics_dict["value"] = attr_dict["value1"]
+				    		ctxt.metrics_type = "L1CACHEMISSES"
+				else: 
+					if attr_dict.has_key("value1"):
+				    		assert(not(attr_dict.has_key("value2")))
+				    		ctxt.metrics_dict["value"] = attr_dict["value1"]
+				    		ctxt.metrics_type = "INT"
+					if attr_dict.has_key("value2"):
+				    		assert(not(attr_dict.has_key("value1")))
+				    		ctxt.metrics_dict["value"] = attr_dict["value2"]
+				    		ctxt.metrics_type = "FP"
 		
 		## add it to context manager
 		context_manager.addContext(ctxt)
 	roots = context_manager.getRoots()
 	print "remaining roots: ", str([r.id for r in roots])
 	assert(len(roots) == 1)
-	#len(context_manager.getRoots()) == 1)
+	context_manager.getRoots()
 	context_manager.populateMetrics()
 	return context_manager
 
-def output_to_file(method_manager, context_manager, dump_data, dump_fp_data):
+def output_to_file(method_manager, context_manager, dump_data, dump_data2):
 	intpr = interpreter.Interpreter(method_manager, context_manager)
-	for ctxt_list in context_manager.getAllPaths("0", "root-leaf"):#"root-subnode"):
-		if ctxt_list[-1].metrics_dict:
-		    key = "\n".join(intpr.getSrcPosition(c) for c in ctxt_list)
-		    if ctxt_list[-1].metrics_type == "INT":
-				if dump_data.has_key(key):
-				    dump_data[key] += (ctxt_list[-1].metrics_dict["value"])
-				else:
-				    dump_data[key] = (ctxt_list[-1].metrics_dict["value"])
-		    elif ctxt_list[-1].metrics_type == "FP":
-				if dump_fp_data.has_key(key):
-				    dump_fp_data[key] += (ctxt_list[-1].metrics_dict["value"])
-				else:
-				    dump_fp_data[key] = (ctxt_list[-1].metrics_dict["value"])
-
+	if isDataCentric:
+		tmp = dict()
+		for ctxt_list in context_manager.getAllPaths("0", "root-leaf"):#"root-subnode"):
+	 		i = 0
+			while i < len(ctxt_list):
+				if ctxt_list[i].metrics_dict:
+					key = "\n".join(intpr.getSrcPosition(c, isDataCentric) for c in ctxt_list[:i])
+					if ctxt_list[i].metrics_type == "ALLOCTIMES" and tmp.has_key(key) == False:
+						tmp[key] = True
+						if dump_data.has_key(key):
+							dump_data[key] += (ctxt_list[i].metrics_dict["value"])
+						else:
+							dump_data[key] = (ctxt_list[i].metrics_dict["value"])
+					elif ctxt_list[i].metrics_type == "L1CACHEMISSES":
+						if dump_data2.has_key(key):
+							dump_data2[key] += (ctxt_list[i].metrics_dict["value"])
+						else:
+							dump_data2[key] = (ctxt_list[i].metrics_dict["value"])
+				i += 1
+	else:		   
+		for ctxt_list in context_manager.getAllPaths("0", "root-leaf"):#"root-subnode"):
+			if ctxt_list[-1].metrics_dict:
+				key = "\n".join(intpr.getSrcPosition(c) for c in ctxt_list[:-1])
+				if ctxt_list[-1].metrics_type == "INT":
+					if dump_data.has_key(key):
+						dump_data[key] += (ctxt_list[-1].metrics_dict["value"])
+					else:
+						dump_data[key] = (ctxt_list[-1].metrics_dict["value"])
+				elif ctxt_list[-1].metrics_type == "FP": 
+					if dump_data2.has_key(key):
+						dump_data2[key] += (ctxt_list[-1].metrics_dict["value"])
+					else:
+						dump_data2[key] = (ctxt_list[-1].metrics_dict["value"])
+			
 def main():
+	file = open("agent-statistics.run", "r")
+	result = file.read().splitlines()
+	file.close()
+
+	global isDataCentric
+	if result[0] == 'DATACENTRIC':
+		isDataCentric = True
+		result = result[1:]
+	
 	### read all agent trace files
 	tid_file_dict = get_all_files(".")
 
@@ -168,8 +205,9 @@ def main():
 	print("Finished loading methods")
 		
 	print("Start to output")
+	
 	dump_data = dict()
-	dump_fp_data = dict()
+	dump_data2 = dict()
 
 	for tid in xml_root_dict:
 		if tid == "method":
@@ -177,41 +215,56 @@ def main():
 		print("Reconstructing contexts from TID " + tid)
 		xml_root = xml_root_dict[tid]
 		print("Dumping contexts from TID "+tid)
-	 	output_to_file(method_manager, load_context(xml_root), dump_data, dump_fp_data)
+	 	output_to_file(method_manager, load_context(xml_root), dump_data, dump_data2)
 
-	result = []
-	file = open("agent-statistics.run", "r")
-	for line in file.readlines():
-		result.append(line)
-	file.close()
-
-	if result:
+	file = open("agent-data", "w")
+	
+	if result and isDataCentric == False:
 		assert(len(result) == 3 or len(result) == 4)
 		deadOrRedBytes = long(result[1])
 
-		file = open("agent-data", "w")
 		if len(result) == 4 and float(result[2]) != 0.:
 			file.write("-----------------------Precise Redundancy------------------------------\n")
 
 		rows = sorted(dump_data.items(), key=lambda x: x[-1], reverse = True)
 		for row in rows:
-			file.write(row[0] + "\nRedundancy Fraction: " + str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+			file.write(row[0] + "\n\nFraction: " + str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
 
 		if len(result) == 4 and float(result[3]) != 0.:
 			file.write("\n----------------------Approximate Redundancy---------------------------\n")
 
-			rows = sorted(dump_fp_data.items(), key=lambda x: x[-1], reverse = True)
+			rows = sorted(dump_data2.items(), key=lambda x: x[-1], reverse = True)
 			for row in rows:
-				file.write(row[0]  + "\nRedundancy Fraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
+				file.write(row[0]  + "\n\nFraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
 	
 		file.write("\nTotal Bytes: " + result[0])
-		file.write("Total Redundant Bytes: " + result[1])
+		file.write("\nTotal Redundant Bytes: " + result[1])
 		if len(result) == 4:
-			file.write("Total Redundancy Fraction: " + str(round((float(result[2]) + float(result[3])) * 100, 2)) + "%")
+			file.write("\nTotal Redundancy Fraction: " + str(round((float(result[2]) + float(result[3])) * 100, 2)) + "%")
 		else:
-			file.write("Total Redundancy Fraction: " + str(round(float(result[2]) * 100, 2)) + "%")
-		file.close()
-	
+			file.write("\nTotal Redundancy Fraction: " + str(round(float(result[2]) * 100, 2)) + "%")
+	elif result:
+		assert(len(result) == 2)
+		allocTimes = long(result[0])
+		l1CacheMisses = long(result[1])
+		if allocTimes != 0:	
+			file.write("-----------------------Allocation Times------------------------------\n")
+			
+			rows = sorted(dump_data.items(), key=lambda x: x[-1], reverse = True)
+			for row in rows:
+				file.write(row[0] + "\n\nFraction: " + str(round(float(row[-1]) * 100 / allocTimes, 2)) +"%\n")
+
+		if l1CacheMisses != 0:
+			file.write("\n-----------------------L1 Cache Misses------------------------------\n")
+
+			rows = sorted(dump_data2.items(), key=lambda x: x[-1], reverse = True)
+			for row in rows:
+				file.write(row[0]  + "\nFraction: " +  str(round(float(row[-1]) * 100 / l1CacheMisses, 2)) +"%\n")
+		file.write("\nTotal Allocation Times: " + result[0])
+		file.write("\nTotal L1 Cache Misses: " + result[1])
+
+	file.close()
+
 	print("Final dumping")
 	
 	remove_all_files(".") 

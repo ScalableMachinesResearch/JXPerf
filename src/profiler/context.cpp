@@ -128,7 +128,7 @@ Context *ContextTree::addContext(Context *parent, const ContextFrame &frame) {
  
   // add the new node under the parent
   parent->addChild(new_ctxt);
-  //add new context to the tree
+  // add the new context to the tree
   _context_map[ctxt_id] = new_ctxt;
   _id_counter++; 
   

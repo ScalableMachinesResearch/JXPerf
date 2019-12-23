@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <new>
 #include <fstream>
+#include <boost/algorithm/string.hpp>
 
 #include "perf_interface.h"
 #include <perfmon/pfmlib_perf_event.h>
@@ -34,7 +35,8 @@
 
 typedef struct {
     int id;
-    int metric_id;
+    int metric_id1;
+    int metric_id2;
     std::string name;
     uint32_t threshold;
     struct perf_event_attr attr;
@@ -116,7 +118,8 @@ bool process_event_list(const std::vector<std::string> &event_list){
             assert(false);
         }
         std::string client_name = event.substr(0, pos);
-        
+	boost::to_upper(client_name);
+
         std::size_t pos2 = event.find("@");
         if(pos2 != std::string::npos) { // found "@"
             current_event_info.name = event.substr(pos+2, pos2-pos-2);
@@ -148,11 +151,13 @@ bool process_event_list(const std::vector<std::string> &event_list){
         metric_info.name = current_event_info.name;
         metric_info.threshold = current_event_info.threshold;
         metric_info.val_type = metrics::METRIC_VAL_INT;
-        current_event_info.metric_id = metrics::MetricInfoManager::registerMetric(metric_info);
+        current_event_info.metric_id1 = metrics::MetricInfoManager::registerMetric(metric_info);
+        current_event_info.metric_id2 = metrics::MetricInfoManager::registerMetric(metric_info);
         
         // extern void SetupWatermarkMetric(int);
         // Watchpoint
-        SetupWatermarkMetric(current_event_info.metric_id);
+        SetupWatermarkMetric(current_event_info.metric_id1);
+        SetupWatermarkMetric(current_event_info.metric_id2);
     }
     return true;
 }
@@ -295,7 +300,7 @@ void perf_event_handler(int sig, siginfo_t* siginfo, void* context){
 	        sample_data.isPrecise = (ehdr.misc & PERF_RECORD_MISC_EXACT_IP) ? true : false;
             perf_read_record_sample(current->mmap_buf, current->event->attr.sample_type, &sample_data);
             if (!inside_sig_unsafe_func)
-                user_sample_cb(current->id, &sample_data, context, current->event->metric_id);
+                user_sample_cb(current->id, &sample_data, context, current->event->metric_id1, current->event->metric_id2);
         }
         else {
             if (ehdr.size == 0) {

@@ -70,7 +70,7 @@ typedef struct WP_RegisterInfo_t{
     int sampleAccessLen;
     uint8_t sampleValue[MAX_WP_LENGTH]; // value
     uint64_t samplePostFull; // per watchpoint survival probability
-    int metricID;
+    int metric_id1;
 } WP_RegisterInfo_t;
 
 typedef struct WP_ThreadData_t {

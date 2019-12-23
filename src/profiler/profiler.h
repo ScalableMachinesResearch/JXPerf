@@ -32,8 +32,10 @@ public:
 
   static inline Profiler &getProfiler(){return _instance;}
 
+  static ASGCT_FN _asgct;
+
 private:
-  static void OnSample(int event_idx, perf_sample_data_t *sample_data, void *context, int metric_id);
+  static void OnSample(int event_idx, perf_sample_data_t *sample_data, void *context, int metric_id1, int metric_id2);
   static WP_TriggerAction_t OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnRedStoreWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnRedLoadWatchPoint(WP_TriggerInfo_t *wpi);
@@ -47,7 +49,6 @@ private:
   CodeCacheManager _code_cache_manager;
   MethodCache _uncompiled_method_cache; // used to store the methods which are never added but shown in context;
 
-  static ASGCT_FN _asgct;
   static Profiler _instance;
 };
 

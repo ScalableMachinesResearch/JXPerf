@@ -1,6 +1,8 @@
 #ifndef __AGENT_H
 #define __AGENT_H
 #include <jvmti.h>
+#include <jni.h>
+#include <jvmticmlr.h>
 #include <assert.h>
 #include <string>
 #include "argument.h"
@@ -69,6 +71,3 @@ private:
   T *_ptr;
 };
 #endif
-
-
-

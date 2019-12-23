@@ -4,6 +4,11 @@
 #include "context.h"
 #include "watchpoint.h"
 
+#define DEADSTORE_CLIENT_NAME "DEADSTORE"
+#define SILENTSTORE_CLIENT_NAME "SILENTSTORE"
+#define SILENTLOAD_CLIENT_NAME "SILENTLOAD"
+#define DATA_CENTRIC_CLIENT_NAME "DATACENTRIC"
+
 #define MAX_WP_LENGTH (8L)
 #define NUM_WATERMARK_METRICS (4)
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))

@@ -44,6 +44,7 @@ public:
   inline Context *getParent() {return _parent;}
   inline bool isTriggered() {return _triggered;}
   inline void setTriggered() {_triggered = true;}
+  uint32_t _id;
 
 private:
   Context(uint32_t id);
@@ -60,7 +61,7 @@ private:
       a->_frame.method_version == b->_frame.method_version;
   }
 
-  uint32_t _id;
+  // uint32_t _id;
   bool _triggered = false;
   ContextFrame _frame;
   metrics::ContextMetrics *_metrics = nullptr; 
@@ -105,7 +106,7 @@ public:
   iterator end() { return iterator(_context_map.end());}
 
 private: 
-  std::unordered_map<uint32_t,Context *> _context_map;
+  std::unordered_map<uint32_t, Context *> _context_map;
   Context *_root;
   uint32_t _id_counter;
 };

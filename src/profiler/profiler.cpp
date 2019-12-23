@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include <algorithm>
 #include <iomanip> 
+#include <stack>
 
 #include "config.h"
 #include "context.h"
@@ -17,15 +18,52 @@
 #include "x86-misc.h"
 #include "context-pc.h" 
 #include "safe-sampling.h"
-
-#define DEADSTORE_CLIENT_NAME "DEADSTORE"
-#define SILENTSTORE_CLIENT_NAME "SILENTSTORE"
-#define SILENTLOAD_CLIENT_NAME "SILENTLOAD"
+#include "splay.h"
+#include "allocation_ins.h"
+#include "lock.h"
 
 #define APPROX_RATE (0.01)
 #define MAX_FRAME_NUM (128)
 // #define MAX_FRAME_NUM (256)
 #define MAX_IP_DIFF (100000000)
+
+Profiler Profiler::_instance;
+ASGCT_FN Profiler::_asgct = nullptr;
+std::string clientName;
+
+static SpinLock lock;
+static SpinLock lock_map;
+static interval_tree_node *splay_tree_root = NULL;
+static std::unordered_map<Context*, Context*> map = {};
+
+
+uint64_t GCCounter = 0;
+__thread uint64_t localGCCounter = 0;
+
+uint64_t grandTotWrittenBytes = 0;
+uint64_t grandTotLoadedBytes = 0;
+uint64_t grandTotUsedBytes = 0;
+uint64_t grandTotDeadBytes = 0;
+uint64_t grandTotNewBytes = 0;
+uint64_t grandTotOldBytes = 0;
+uint64_t grandTotOldAppxBytes = 0;
+uint64_t grandTotL1Cachemiss = 0;
+uint64_t grandTotAllocTimes = 0;
+
+__thread uint64_t totalWrittenBytes = 0;
+__thread uint64_t totalLoadedBytes = 0;
+__thread uint64_t totalUsedBytes = 0;
+__thread uint64_t totalDeadBytes = 0;
+__thread uint64_t totalNewBytes = 0;
+__thread uint64_t totalOldBytes = 0;
+__thread uint64_t totalOldAppxBytes = 0;
+__thread uint64_t totalL1Cachemiss = 0;
+__thread uint64_t totalAllocTimes = 0;
+
+__thread void *prevIP = (void *)0;
+
+// __thread uint64_t sampleCnt = 0;
+// uint64_t totalSampleCnt = 0;
 
 namespace {
 
@@ -42,72 +80,154 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
     
     for (int i = trace.num_frames - 1 ; i >= 0; i--) {
         // TODO: We need to consider how to include the native method.
-        ContextFrame ctxtframe;
-        ctxtframe = frames[i]; //set method_id and bci
-        if (last_ctxt == nullptr) last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxtframe);
-        else last_ctxt = ctxt_tree->addContext(last_ctxt, ctxtframe);
+        ContextFrame ctxt_frame;
+        ctxt_frame = frames[i]; //set method_id and bci
+        if (last_ctxt == nullptr) last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
+        else last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);
     }
 
     // leaf node 
-    ContextFrame ctxtframe;
-    ctxtframe.binary_addr = ip;
-    ctxtframe.method_id = method_id;
-    ctxtframe.method_version = method_version;
+    ContextFrame ctxt_frame;
+    ctxt_frame.binary_addr = ip;
+    ctxt_frame.method_id = method_id;
+    ctxt_frame.method_version = method_version;
     // It's sort of tricky. Use bci to split a context pair.
-    if (ctxt == nullptr) ctxtframe.bci = -65536;
-    if (last_ctxt != nullptr) last_ctxt = ctxt_tree->addContext(last_ctxt, ctxtframe);
-    else last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxtframe);
+    if (ctxt == nullptr) ctxt_frame.bci = -65536;
+    if (last_ctxt != nullptr) last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);
+    else last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
     
     return last_ctxt;
 }
 
+Context *allocation_constructContext(ASGCT_FN asgct, void *context){
+    ASGCT_CallTrace trace;
+    ASGCT_CallFrame frames[MAX_FRAME_NUM];
+    
+    trace.frames = frames;
+    trace.env_id = JVM::jni();
+    
+    asgct(&trace, MAX_FRAME_NUM, context);
+    
+    ContextTree *ctxt_tree = reinterpret_cast<ContextTree *> (TD_GET(context_state));
+    if(ctxt_tree == nullptr) return nullptr;
+    
+    Context *last_ctxt = nullptr;
+        
+    for(int i=trace.num_frames - 1 ; i >= 0; i--) {
+        ContextFrame ctxt_frame;
+        ctxt_frame = frames[i]; // set method_id and bci
+        
+        if (last_ctxt == nullptr) last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
+        else last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);
+    }
+    	
+    ContextFrame ctxt_frame;
+    ctxt_frame.bci = -65536;
+    if (last_ctxt == nullptr)
+        last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
+    else
+        last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);       
+    
+    metrics::ContextMetrics *metrics = last_ctxt->getMetrics();
+    if (metrics == nullptr) {
+        metrics = new metrics::ContextMetrics();
+        last_ctxt->setMetrics(metrics);
+    }
+    metrics::metric_val_t metric_val;
+    metric_val.i = 1;
+    assert(metrics->increment(0, metric_val)); // id = 0: allocation times
+    totalAllocTimes += 1;
+
+    return last_ctxt;
+}
 }
 
-Profiler Profiler::_instance;
-ASGCT_FN Profiler::_asgct = nullptr;
-std::string clientName;
 
-uint64_t GCCounter = 0;
-__thread uint64_t localGCCounter = 0;
-
-uint64_t grandTotWrittenBytes = 0;
-uint64_t grandTotLoadedBytes = 0;
-uint64_t grandTotUsedBytes = 0;
-uint64_t grandTotDeadBytes = 0;
-uint64_t grandTotNewBytes = 0;
-uint64_t grandTotOldBytes = 0;
-uint64_t grandTotOldAppxBytes = 0;
-
-__thread uint64_t totalWrittenBytes = 0;
-__thread uint64_t totalLoadedBytes = 0;
-__thread uint64_t totalUsedBytes = 0;
-__thread uint64_t totalDeadBytes = 0;
-__thread uint64_t totalNewBytes = 0;
-__thread uint64_t totalOldBytes = 0;
-__thread uint64_t totalOldAppxBytes = 0;
-
-__thread void *prevIP = (void *)0;
-
-// __thread uint64_t sampleCnt = 0;
-// uint64_t totalSampleCnt = 0;
-
-void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metricID) {
-    // sampleCnt++;
+void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metric_id1, int metric_id2) {
     if (!sampleData->isPrecise || !sampleData->addr) return;
     
     void *sampleIP = (void *)(sampleData->ip);
     void *sampleAddr = (void *)(sampleData->addr); 
     
-    if (!IsValidAddress(sampleIP, sampleAddr)) return;
-    // void *contextIP = getContextPC(uCtxt);
-    // if (sampleIP < contextIP - MAX_IP_DIFF || sampleIP > contextIP + MAX_IP_DIFF) return;
+    if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
+        if (!IsValidAddress(sampleIP, sampleAddr)) return;
+    }
 
     jmethodID method_id = 0;
     uint32_t method_version = 0;
     CodeCacheManager &code_cache_manager = Profiler::getProfiler().getCodeCacheManager();
     
     CompiledMethod *method = code_cache_manager.getMethod(sampleData->ip, method_id, method_version);
-    if(method == nullptr) return;
+    if (method == nullptr) return;
+    
+    uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(metric_id1))->threshold;
+
+    // data-centric analysis
+    if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+        void* startaddress;
+        lock.lock();
+        interval_tree_node *p = interval_tree_lookup(&splay_tree_root, sampleAddr, &startaddress);
+        lock.unlock();
+
+        if (p != NULL) {
+	    // assert(p->node_ctxt != nullptr);
+	    Context *ctxt = p->node_ctxt; 
+	    std::stack<Context *> ctxt_stack;
+	    while (ctxt != nullptr) {
+	        ctxt_stack.push(ctxt);
+		ctxt = ctxt->getParent();
+	    }
+
+	    if (!ctxt_stack.empty()) ctxt_stack.pop(); // pop out the root
+	    
+	    ctxt = nullptr;
+    	    ContextTree *ctxt_tree = reinterpret_cast<ContextTree *> (TD_GET(context_state));
+	    while (!ctxt_stack.empty()) {
+		ContextFrame ctxt_frame = ctxt_stack.top()->getFrame();
+                if (ctxt == nullptr) ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
+                else ctxt = ctxt_tree->addContext(ctxt, ctxt_frame);
+		ctxt_stack.pop();
+	    }
+            
+	    Context *ctxt_allocate = constructContext(_asgct, uCtxt, sampleData->ip, ctxt, method_id, method_version);
+	    Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
+            
+	    lock_map.lock();
+            map[ctxt_access] = ctxt_allocate;
+            lock_map.unlock();
+            if (ctxt_allocate != nullptr && sampleData->ip != 0) {
+                metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
+                if (metrics == nullptr) {
+                    metrics = new metrics::ContextMetrics();
+                    ctxt_allocate->setMetrics(metrics);
+                }
+                metrics::metric_val_t metric_val;
+                metric_val.i = threshold;
+                assert(metrics->increment(metric_id2, metric_val));
+                totalL1Cachemiss += threshold;
+            }
+        } else {
+            Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
+            lock_map.lock();
+            std::unordered_map<Context*, Context*>::iterator it = map.find(ctxt_access);
+            lock_map.unlock();
+            if (it != map.end()) {
+                Context *ctxt_allocate = it->second;
+                if (ctxt_allocate != nullptr && sampleData->ip != 0) {
+                    metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
+                    if (metrics == nullptr) {
+                        metrics = new metrics::ContextMetrics();
+                        ctxt_allocate->setMetrics(metrics);
+                    }
+                    metrics::metric_val_t metric_val;
+                    metric_val.i = threshold;
+                    assert(metrics->increment(metric_id2, metric_val));
+                    totalL1Cachemiss += threshold;
+                }
+            }
+        }
+        return;
+    }
 
     int accessLen;
     AccessType accessType;
@@ -117,13 +237,12 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
 
     Context *watchCtxt = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
     if (watchCtxt == nullptr) return;
-    UpdateNumSamples(watchCtxt, metricID); 
+    UpdateNumSamples(watchCtxt, metric_id1); 
 
 #ifdef PRINT_PMU_INS
     std::ofstream *pmu_ins_output_stream = reinterpret_cast<std::ofstream *>(TD_GET(pmu_ins_output_stream));
     assert(pmu_ins_output_stream != nullptr);
     print_single_instruction(pmu_ins_output_stream, (const void *)sampleIP);
-    // *pmu_ins_output_stream << sampleAddr << std::endl;;
 #endif
     
 #ifdef ACCURACY_CHECK    
@@ -139,8 +258,6 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     }
 #endif
     
-    uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(metricID))->threshold;
-
 #ifdef COUNT_UP_SAMPLE_NUM
     metrics::ContextMetrics *metrics = watchCtxt->getMetrics();
     if (metrics == nullptr) {
@@ -149,24 +266,24 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     }
     metrics::metric_val_t metric_val;
     metric_val.i = threshold;
-    assert(metrics->increment(metricID, metric_val));
+    assert(metrics->increment(metric_id1, metric_val));
 #endif
     if (localGCCounter < GCCounter) {
-        // printf(" diff = %d\n", GCCounter - localGCCounter);
         WP_DisableAllWatchPoints();
         localGCCounter++;
     }
+
     if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0 && accessType != LOAD) {
         totalWrittenBytes += accessLen * threshold;
-        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metricID, false);
+        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metric_id1, false);
     } else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0 && accessType != LOAD) {
         totalWrittenBytes += accessLen * threshold;
-        WP_Subscribe(sampleAddr, watchLen, WP_WRITE, accessLen, watchCtxt, metricID, true);
+        WP_Subscribe(sampleAddr, watchLen, WP_WRITE, accessLen, watchCtxt, metric_id1, true);
     } else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0 && accessType != STORE) { 
         totalLoadedBytes += accessLen * threshold;
-        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metricID, true);
+        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metric_id1, true);
     } else {
-        ERROR("Mismatch between %s and the sampled instruction(%p, %p)", clientName.c_str(), sampleIP, sampleAddr);
+        ERROR("Unknown client name: %s or mismatch between the client name: %s and the sampled instruction: %p", clientName.c_str(), clientName.c_str(), sampleIP);
     }
 }
 
@@ -224,8 +341,8 @@ WP_TriggerAction_t Profiler::OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpt) {
     Context *watchCtxt =(Context *)(wpt->watchCtxt);
     
     double myProp = 1.0;
-    uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(wpt->metricID))->threshold;
-    uint64_t numDiffSamples = GetNumDiffSamplesAndReset(watchCtxt, wpt->metricID, myProp, threshold);
+    uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(wpt->metric_id1))->threshold;
+    uint64_t numDiffSamples = GetNumDiffSamplesAndReset(watchCtxt, wpt->metric_id1, myProp, threshold);
     uint64_t inc = numDiffSamples * wpt->sampleAccessLen;
     if (inc == 0) {
         profiler_safe_exit();
@@ -260,7 +377,7 @@ WP_TriggerAction_t Profiler::OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpt) {
         }
         metrics::metric_val_t metric_val;
         metric_val.i = inc;
-        assert(metrics->increment(wpt->metricID, metric_val));
+        assert(metrics->increment(wpt->metric_id1, metric_val));
     }
     
     profiler_safe_exit();
@@ -296,14 +413,14 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
         return WP_DISABLE;
     }
 
-    int firstOffest = FIRST_OVERLAPPED_BYTE_OFFSET_IN_FIRST(wpt->va, accessLen, sampleAddr, wpt->watchLen);
-    int secondOffest = FIRST_OVERLAPPED_BYTE_OFFSET_IN_SECOND(wpt->va, accessLen, sampleAddr, wpt->watchLen);
-    void *sampleStartByte = sampleAddr + secondOffest;
-    void *wptStartByte = wpt->va + firstOffest;
+    int firstOffset = FIRST_OVERLAPPED_BYTE_OFFSET_IN_FIRST(wpt->va, accessLen, sampleAddr, wpt->watchLen);
+    int secondOffset = FIRST_OVERLAPPED_BYTE_OFFSET_IN_SECOND(wpt->va, accessLen, sampleAddr, wpt->watchLen);
+    void *sampleStartByte = sampleAddr + secondOffset;
+    void *wptStartByte = wpt->va + firstOffset;
     
     double myProp = 1.0;
-    uint32_t threshold = metrics::MetricInfoManager::getMetricInfo(wpt->metricID)->threshold;
-    uint64_t numDiffSamples = GetNumDiffSamplesAndReset(watchCtxt, wpt->metricID, myProp, threshold);
+    uint32_t threshold = metrics::MetricInfoManager::getMetricInfo(wpt->metric_id1)->threshold;
+    uint64_t numDiffSamples = GetNumDiffSamplesAndReset(watchCtxt, wpt->metric_id1, myProp, threshold);
     uint64_t inc = numDiffSamples * wpt->sampleAccessLen;
     if (inc == 0) return WP_DISABLE;
     
@@ -321,7 +438,7 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
                 if (!IS_4_BYTE_ALIGNED(wptStartByte)) {
                     goto TreatLikeInteger;  
                 }
-               float oldValue = *(float *)(wpt->sampleValue + secondOffest); 
+               float oldValue = *(float *)(wpt->sampleValue + secondOffset); 
                float newValue = *(float *)(wptStartByte);
                 if (oldValue != newValue) {
                     float rate = (oldValue - newValue) / oldValue;
@@ -342,7 +459,7 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
                 if (!IS_8_BYTE_ALIGNED(wptStartByte)) {
                     goto TreatLikeInteger;  
                 }
-                double oldValue = *(double *)(wpt->sampleValue + secondOffest); 
+                double oldValue = *(double *)(wpt->sampleValue + secondOffset); 
                 double newValue = *(double *)(wptStartByte);
                 if (oldValue != newValue) {
                     double rate = (oldValue - newValue) / oldValue;
@@ -369,13 +486,13 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
             }
             metrics::metric_val_t metric_val;
             metric_val.r = inc;
-            assert(metrics->increment(wpt->metricID, metric_val));
+            assert(metrics->increment(wpt->metric_id1, metric_val));
         } else {
             totalNewBytes += inc;
         }
     } else {
     TreatLikeInteger:
-        for(int i = firstOffest, k = secondOffest ; i < firstOffest + overlapBytes; i++, k++) {
+        for(int i = firstOffset, k = secondOffset ; i < firstOffset + overlapBytes; i++, k++) {
             if(((uint8_t *)(wpt->va))[i] == ((uint8_t *)(wpt->sampleValue))[k]) {
                 redBytes++;
             } else {
@@ -395,7 +512,7 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
             }
             metrics::metric_val_t metric_val;
             metric_val.i = inc;
-            assert(metrics->increment(wpt->metricID, metric_val));
+            assert(metrics->increment(wpt->metric_id1, metric_val));
         } else {
             totalNewBytes += inc;
         }
@@ -517,23 +634,6 @@ void Profiler::shutdown() {
 #ifndef COUNT_OVERHEAD
     _method_file.close();
 #endif
-    
-
-#if 0    
-    if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0) {
-        printf("Written bytes: %lu\n", grandTotWrittenBytes);
-        printf("Dead bytes: %lu %.2f%%\n", grandTotDeadBytes,  grandTotDeadBytes * 100.0 / (grandTotDeadBytes + grandTotUsedBytes));
-    } else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) {
-        printf("Written bytes: %lu\n", grandTotWrittenBytes);
-        printf("Redundant bytes: %lu %.2f%%\n", grandTotOldBytes,  grandTotOldBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
-        printf("Approximate redundant bytes: %lu %.2f%%\n", grandTotOldAppxBytes,  grandTotOldAppxBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
-    } else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) {
-        printf("Loaded bytes: %lu\n", grandTotLoadedBytes);
-        printf("Redundant bytes: %lu %.2f%%\n", grandTotOldBytes,  grandTotOldBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
-        printf("Approximate redundant bytes: %lu %.2f%%\n", grandTotOldAppxBytes,  grandTotOldAppxBytes * 100.0 / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes));
-    }
-#endif
-
 }
 
 void Profiler::IncrementGCCouter() {
@@ -548,6 +648,8 @@ void Profiler::threadStart() {
     totalNewBytes = 0;
     totalOldBytes = 0;
     totalOldAppxBytes = 0;
+    totalL1Cachemiss = 0;
+    totalAllocTimes = 0;
 
     ThreadData::thread_data_alloc();
     ContextTree *ct_tree = new(std::nothrow) ContextTree();
@@ -573,13 +675,13 @@ void Profiler::threadStart() {
         TD_GET(pmu_ins_output_stream) = reinterpret_cast<void *>(pmu_ins_output_stream);
 #endif
     }
-     if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnDeadStoreWatchPoint));
-     else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedStoreWatchPoint));
-     else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedLoadWatchPoint));
-     else {
+    if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnDeadStoreWatchPoint));
+    else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedStoreWatchPoint));
+    else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedLoadWatchPoint));
+    else if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) { 
         ERROR("Can't decode client %s", clientName.c_str());
         assert(false);
-     }
+    }
     PopulateBlackListAddresses();
     PerfManager::setupEvents();
 }
@@ -587,17 +689,19 @@ void Profiler::threadStart() {
 
 void Profiler::threadEnd() {
     PerfManager::closeEvents();
-    WP_ThreadTerminate();
+    if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
+        WP_ThreadTerminate();
+    }
     ContextTree *ctxt_tree = reinterpret_cast<ContextTree *>(TD_GET(context_state));
-
+        
 #ifndef COUNT_OVERHEAD    
     OUTPUT *output_stream = reinterpret_cast<OUTPUT *>(TD_GET(output_state));
     std::unordered_set<Context *> dump_ctxt = {};
     
     for (auto elem : (*ctxt_tree)) {
         Context *ctxt_ptr = elem;
-        ctxt_ptr = elem;
-        jmethodID method_id = ctxt_ptr->getFrame().method_id;
+
+	jmethodID method_id = ctxt_ptr->getFrame().method_id;
         _code_cache_manager.checkAndMoveMethodToUncompiledSet(method_id);
     
         if (ctxt_ptr->getMetrics() != nullptr && dump_ctxt.find(ctxt_ptr) == dump_ctxt.end()) { // leaf node of the redundancy pair
@@ -656,6 +760,8 @@ void Profiler::threadEnd() {
     __sync_fetch_and_add(&grandTotNewBytes, totalNewBytes);
     __sync_fetch_and_add(&grandTotOldBytes, totalOldBytes);
     __sync_fetch_and_add(&grandTotOldAppxBytes, totalOldAppxBytes);
+    __sync_fetch_and_add(&grandTotL1Cachemiss, totalL1Cachemiss);
+    __sync_fetch_and_add(&grandTotAllocTimes, totalAllocTimes);
 }
 
 
@@ -681,5 +787,56 @@ void Profiler::output_statistics() {
         _statistics_file << grandTotOldBytes + grandTotOldAppxBytes << std::endl; 
         _statistics_file << (double)grandTotOldBytes / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes) << std::endl;
         _statistics_file << (double)grandTotOldAppxBytes / (grandTotOldBytes + grandTotOldAppxBytes + grandTotNewBytes);
+    } else if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+        _statistics_file << clientName << std::endl;
+        _statistics_file << grandTotAllocTimes << std::endl;
+        _statistics_file << grandTotL1Cachemiss << std::endl;
     }
+}
+
+/****************
+JNI methods for Data-Centric Analysis
+*****************/
+
+void empty_splay_tree(interval_tree_node *root) {
+    if(root == NULL)
+        return;
+    empty_splay_tree(LEFT(root));
+    empty_splay_tree(RIGHT(root));
+    free(root);
+}
+
+JNIEXPORT void JNICALL
+Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_clearTree(JNIEnv *env, jobject obj) {
+    profiler_safe_enter();
+    lock.lock();
+    empty_splay_tree(splay_tree_root);
+    splay_tree_root = NULL; // splay_tree_root also has been removed in empty_splay tree, we couldn't insert anything if we don't reinitialize it here
+    lock.unlock();
+    profiler_safe_exit();
+}
+
+JNIEXPORT void JNICALL
+Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_dataCentric(JNIEnv *env, jobject obj, jstring addr, jlong size) { 
+    profiler_safe_enter();
+    
+    const char *tmp = env->GetStringUTFChars(addr, 0);
+    char *pend;
+    uint64_t startingAddr = strtol(tmp, &pend, 16);
+    uint64_t obj_size = size;
+    uint64_t endingAddr = startingAddr + obj_size;
+    
+    ucontext_t context, *cp = &context;
+    getcontext(cp);
+    Context *ctxt = allocation_constructContext(Profiler::_asgct, (void*)cp);
+    if (ctxt == nullptr) return;
+    interval_tree_node *node = node_make((void*)startingAddr, (void*)endingAddr, ctxt);
+    
+    lock.lock();
+    interval_tree_insert(&splay_tree_root, node);
+    lock.unlock();
+
+    env->ReleaseStringUTFChars(addr, tmp);
+
+    profiler_safe_exit();
 }

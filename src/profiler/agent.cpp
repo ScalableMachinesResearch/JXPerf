@@ -7,13 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <dlfcn.h>
 
 #include "thread_data.h"
 #include "agent.h"
 #include "profiler.h"
 #include "debug.h"
 #include "safe-sampling.h"
-#include <jvmticmlr.h>
+#include "profiler_support.h"
 
 /* Used to block the interrupt from PERF */
 #define BLOCK_SAMPLE (TD_GET(inside_agent) = true) 
@@ -61,6 +62,22 @@ static void JNICALL callbackVMInit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
   for (int i = 0; i < class_count; ++i) {
     jclass klass = classList[i];
     createJMethodIDsForClass(jvmti, klass);
+  }
+  std::string client_name = GetClientName();
+
+  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+    jclass myClass = NULL;
+    jmethodID main = NULL;
+    jmethodID main_gc = NULL;
+        
+    //Call java agent register_callback
+    myClass = jni->FindClass("com/google/monitoring/runtime/instrumentation/AllocationInstrumenter");
+        
+    main = jni->GetStaticMethodID(myClass, "register_callback", "([Ljava/lang/String;)V");
+    jni->CallStaticVoidMethod(myClass, main, " ");
+
+    main_gc = jni->GetStaticMethodID(myClass, "installGCMonitoring", "([Ljava/lang/String;)V");
+    jni->CallStaticVoidMethod(myClass, main_gc, " ");
   }
   // UNBLOCK_SAMPLE;
 }
