@@ -33,5 +33,5 @@
       b) The metric "L1 Cache Misses" reports a pair of calling context (i.e., <allocation site, access site>) for every object incurring L1 cache misses
       c) To analyze memory bloat
         (1) Identify the objects suffering from high L1 cache misses by looking into the metric "L1 Cache Misses" 
-	(2) Check whether these objects have high allocation times by looking into the metric "Allocation Times" 
-	(3) The objects having both high L1 cache misses and allocation times are primary optimization candidates
+        (2) Check whether these objects have high allocation times by looking into the metric "Allocation Times" 
+        (3) The objects having both high L1 cache misses and allocation times are primary optimization candidates
