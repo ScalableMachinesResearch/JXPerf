@@ -25,9 +25,15 @@ typedef struct splay_interval_s interval_tree_node;
 #define SRIGHT(n)  (n).next
 #define SLEFT(n)   (n).prev
 
-interval_tree_node *interval_tree_lookup(interval_tree_node **root, void *addr, void** startaddress);
-int interval_tree_insert(interval_tree_node **root, interval_tree_node *node);
-void interval_tree_delete(interval_tree_node **root, interval_tree_node **del_tree, interval_tree_node *node);
-interval_tree_node* node_make(void *start, void *end, Context *ctxt);
+class SplayTree {
+public:
+    static interval_tree_node *interval_tree_lookup(interval_tree_node **root, void *addr, void** startaddress);
+    static int interval_tree_insert(interval_tree_node **root, interval_tree_node *node);
+    static void interval_tree_delete(interval_tree_node **root, interval_tree_node **del_tree, interval_tree_node *node);
+    static interval_tree_node* node_make(void *start, void *end, Context *ctxt);
+
+private:
+    static interval_tree_node* interval_tree_splay(interval_tree_node *root, void *addr);
+};
 
 #endif

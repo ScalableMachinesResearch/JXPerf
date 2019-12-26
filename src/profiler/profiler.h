@@ -11,6 +11,8 @@
 #include "code_cache.h"
 #include "watchpoint.h"
 #include "profiler_support.h"
+#include "splay.h"
+#include "lock.h"
 
 class Profiler {
 public:
@@ -40,6 +42,7 @@ private:
   static WP_TriggerAction_t OnRedStoreWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnRedLoadWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t DetectRedundancy(WP_TriggerInfo_t *wpi, jmethodID method_id, uint32_t method_version, std::string client_name);
+  static void DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2);
   
   inline void output_statistics(); 
 

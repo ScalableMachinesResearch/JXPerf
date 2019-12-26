@@ -18,22 +18,18 @@
 #include "x86-misc.h"
 #include "context-pc.h" 
 #include "safe-sampling.h"
-#include "splay.h"
-#include "allocation_ins.h"
-#include "lock.h"
 
 #define APPROX_RATE (0.01)
 #define MAX_FRAME_NUM (128)
-// #define MAX_FRAME_NUM (256)
 #define MAX_IP_DIFF (100000000)
 
 Profiler Profiler::_instance;
 ASGCT_FN Profiler::_asgct = nullptr;
 std::string clientName;
 
-static SpinLock lock;
 static SpinLock lock_map;
-static interval_tree_node *splay_tree_root = NULL;
+SpinLock tree_lock;
+interval_tree_node *splay_tree_root = NULL;
 static std::unordered_map<Context*, Context*> map = {};
 
 uint64_t GCCounter = 0;
@@ -98,47 +94,6 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
     return last_ctxt;
 }
 
-Context *allocation_constructContext(ASGCT_FN asgct, void *context){
-    ASGCT_CallTrace trace;
-    ASGCT_CallFrame frames[MAX_FRAME_NUM];
-    
-    trace.frames = frames;
-    trace.env_id = JVM::jni();
-    
-    asgct(&trace, MAX_FRAME_NUM, context);
-    
-    ContextTree *ctxt_tree = reinterpret_cast<ContextTree *> (TD_GET(context_state));
-    if(ctxt_tree == nullptr) return nullptr;
-    
-    Context *last_ctxt = nullptr;
-        
-    for(int i=trace.num_frames - 1 ; i >= 0; i--) {
-        ContextFrame ctxt_frame;
-        ctxt_frame = frames[i]; // set method_id and bci
-        
-        if (last_ctxt == nullptr) last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
-        else last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);
-    }
-    	
-    ContextFrame ctxt_frame;
-    ctxt_frame.bci = -65536;
-    if (last_ctxt == nullptr)
-        last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
-    else
-        last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);       
-    
-    metrics::ContextMetrics *metrics = last_ctxt->getMetrics();
-    if (metrics == nullptr) {
-        metrics = new metrics::ContextMetrics();
-        last_ctxt->setMetrics(metrics);
-    }
-    metrics::metric_val_t metric_val;
-    metric_val.i = 1;
-    assert(metrics->increment(0, metric_val)); // id = 0: allocation times
-    totalAllocTimes += 1;
-
-    return last_ctxt;
-}
 }
 
 
@@ -163,68 +118,7 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
 
     // data-centric analysis
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
-        void* startaddress;
-        lock.lock();
-        interval_tree_node *p = interval_tree_lookup(&splay_tree_root, sampleAddr, &startaddress);
-        lock.unlock();
-
-        if (p != NULL) {
-	    // assert(p->node_ctxt != nullptr);
-	    Context *ctxt = p->node_ctxt; 
-	    std::stack<Context *> ctxt_stack;
-	    while (ctxt != nullptr) {
-	        ctxt_stack.push(ctxt);
-		ctxt = ctxt->getParent();
-	    }
-
-	    if (!ctxt_stack.empty()) ctxt_stack.pop(); // pop out the root
-	    
-	    ctxt = nullptr;
-    	    ContextTree *ctxt_tree = reinterpret_cast<ContextTree *> (TD_GET(context_state));
-	    while (!ctxt_stack.empty()) {
-		ContextFrame ctxt_frame = ctxt_stack.top()->getFrame();
-                if (ctxt == nullptr) ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
-                else ctxt = ctxt_tree->addContext(ctxt, ctxt_frame);
-		ctxt_stack.pop();
-	    }
-            
-	    Context *ctxt_allocate = constructContext(_asgct, uCtxt, sampleData->ip, ctxt, method_id, method_version);
-	    Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
-            
-	    lock_map.lock();
-            map[ctxt_access] = ctxt_allocate;
-            lock_map.unlock();
-            if (ctxt_allocate != nullptr && sampleData->ip != 0) {
-                metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
-                if (metrics == nullptr) {
-                    metrics = new metrics::ContextMetrics();
-                    ctxt_allocate->setMetrics(metrics);
-                }
-                metrics::metric_val_t metric_val;
-                metric_val.i = threshold;
-                assert(metrics->increment(metric_id2, metric_val));
-                totalL1Cachemiss += threshold;
-            }
-        } else {
-            Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
-            lock_map.lock();
-            std::unordered_map<Context*, Context*>::iterator it = map.find(ctxt_access);
-            lock_map.unlock();
-            if (it != map.end()) {
-                Context *ctxt_allocate = it->second;
-                if (ctxt_allocate != nullptr && sampleData->ip != 0) {
-                    metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
-                    if (metrics == nullptr) {
-                        metrics = new metrics::ContextMetrics();
-                        ctxt_allocate->setMetrics(metrics);
-                    }
-                    metrics::metric_val_t metric_val;
-                    metric_val.i = threshold;
-                    assert(metrics->increment(metric_id2, metric_val));
-                    totalL1Cachemiss += threshold;
-                }
-            }
-        }
+        DataCentricAnalysis(sampleData, uCtxt, method_id, method_version, threshold, metric_id2);
         return;
     }
 
@@ -286,6 +180,70 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     }
 }
 
+void Profiler::DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2) {
+	void* startaddress;
+	tree_lock.lock();
+	interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void *)(sampleData->addr), &startaddress);
+	tree_lock.unlock();
+
+	if (p != NULL) {
+		// assert(p->node_ctxt != nullptr);
+		Context *ctxt = p->node_ctxt; 
+		std::stack<Context *> ctxt_stack;
+		while (ctxt != nullptr) {
+			ctxt_stack.push(ctxt);
+		ctxt = ctxt->getParent();
+		}
+
+		if (!ctxt_stack.empty()) ctxt_stack.pop(); // pop out the root
+		
+		ctxt = nullptr;
+		ContextTree *ctxt_tree = reinterpret_cast<ContextTree *> (TD_GET(context_state));
+		while (!ctxt_stack.empty()) {
+			ContextFrame ctxt_frame = ctxt_stack.top()->getFrame();
+			if (ctxt == nullptr) ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
+			else ctxt = ctxt_tree->addContext(ctxt, ctxt_frame);
+			ctxt_stack.pop();
+		}
+			
+		Context *ctxt_allocate = constructContext(_asgct, uCtxt, sampleData->ip, ctxt, method_id, method_version);
+		Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
+			
+		lock_map.lock();
+		map[ctxt_access] = ctxt_allocate;
+		lock_map.unlock();
+		if (ctxt_allocate != nullptr && sampleData->ip != 0) {
+			metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
+			if (metrics == nullptr) {
+				metrics = new metrics::ContextMetrics();
+				ctxt_allocate->setMetrics(metrics);
+			}
+			metrics::metric_val_t metric_val;
+			metric_val.i = threshold;
+			assert(metrics->increment(metric_id2, metric_val));
+			totalL1Cachemiss += threshold;
+		}
+	} else {
+		Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
+		lock_map.lock();
+		std::unordered_map<Context*, Context*>::iterator it = map.find(ctxt_access);
+		lock_map.unlock();
+		if (it != map.end()) {
+			Context *ctxt_allocate = it->second;
+			if (ctxt_allocate != nullptr && sampleData->ip != 0) {
+				metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
+				if (metrics == nullptr) {
+					metrics = new metrics::ContextMetrics();
+					ctxt_allocate->setMetrics(metrics);
+				}
+				metrics::metric_val_t metric_val;
+				metric_val.i = threshold;
+				assert(metrics->increment(metric_id2, metric_val));
+				totalL1Cachemiss += threshold;
+			}
+		}
+	}
+}
 
 WP_TriggerAction_t Profiler::OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpt) {
     if (!profiler_safe_enter()) return WP_DISABLE;
@@ -791,51 +749,4 @@ void Profiler::output_statistics() {
         _statistics_file << grandTotAllocTimes << std::endl;
         _statistics_file << grandTotL1Cachemiss << std::endl;
     }
-}
-
-/****************
-JNI methods for Data-Centric Analysis
-*****************/
-
-void empty_splay_tree(interval_tree_node *root) {
-    if(root == NULL)
-        return;
-    empty_splay_tree(LEFT(root));
-    empty_splay_tree(RIGHT(root));
-    free(root);
-}
-
-JNIEXPORT void JNICALL
-Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_clearTree(JNIEnv *env, jobject obj) {
-    profiler_safe_enter();
-    lock.lock();
-    empty_splay_tree(splay_tree_root);
-    splay_tree_root = NULL; // splay_tree_root also has been removed in empty_splay tree, we couldn't insert anything if we don't reinitialize it here
-    lock.unlock();
-    profiler_safe_exit();
-}
-
-JNIEXPORT void JNICALL
-Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_dataCentric(JNIEnv *env, jobject obj, jstring addr, jlong size) { 
-    profiler_safe_enter();
-    
-    const char *tmp = env->GetStringUTFChars(addr, 0);
-    char *pend;
-    uint64_t startingAddr = strtol(tmp, &pend, 16);
-    uint64_t obj_size = size;
-    uint64_t endingAddr = startingAddr + obj_size;
-    
-    ucontext_t context, *cp = &context;
-    getcontext(cp);
-    Context *ctxt = allocation_constructContext(Profiler::_asgct, (void*)cp);
-    if (ctxt == nullptr) return;
-    interval_tree_node *node = node_make((void*)startingAddr, (void*)endingAddr, ctxt);
-    
-    lock.lock();
-    interval_tree_insert(&splay_tree_root, node);
-    lock.unlock();
-
-    env->ReleaseStringUTFChars(addr, tmp);
-
-    profiler_safe_exit();
 }

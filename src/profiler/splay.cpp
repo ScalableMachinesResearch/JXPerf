@@ -3,9 +3,7 @@
 #include <cinttypes>
 #include "splay.h"
 
-static interval_tree_node *
-interval_tree_splay(interval_tree_node *root, void *addr)
-{
+interval_tree_node* SplayTree::interval_tree_splay(interval_tree_node *root, void *addr) {
     interval_tree_node dummy;
     interval_tree_node *ltree_max, *rtree_min, *y;
 
@@ -57,11 +55,9 @@ interval_tree_splay(interval_tree_node *root, void *addr)
     return (root);
 }
 
-interval_tree_node *
-interval_tree_lookup(interval_tree_node **root,  /* in/out */
+interval_tree_node* SplayTree::interval_tree_lookup(interval_tree_node **root,  /* in/out */
              void *addr, 
-             void** startaddress)
-{
+             void** startaddress) {
     *root = interval_tree_splay(*root, addr);
     if (*root != NULL && START(*root) <= addr && addr < END(*root)) {
         //printf("in splay.cpp, startaddress: %lx(16) %" PRIu64 "\n", (*root)->start, (*root)->start);
@@ -72,8 +68,7 @@ interval_tree_lookup(interval_tree_node **root,  /* in/out */
     return (NULL);
 }
 
-int
-interval_tree_insert(interval_tree_node **root,  /* in/out */
+int SplayTree::interval_tree_insert(interval_tree_node **root,  /* in/out */
              interval_tree_node *node)
 {
     interval_tree_node *t;
@@ -116,8 +111,7 @@ interval_tree_insert(interval_tree_node **root,  /* in/out */
     return (1);
 }
 
-void
-interval_tree_delete(interval_tree_node **root,      /* in/out */
+void SplayTree::interval_tree_delete(interval_tree_node **root,      /* in/out */
              interval_tree_node **del_tree,  /* out */
              interval_tree_node *node)
 {
@@ -168,7 +162,7 @@ interval_tree_delete(interval_tree_node **root,      /* in/out */
     }
 }
 
-interval_tree_node* node_make(void *start, void *end, Context *ctxt)
+interval_tree_node* SplayTree::node_make(void *start, void *end, Context *ctxt)
 {
     interval_tree_node *node = (interval_tree_node*)malloc(sizeof(interval_tree_node));
     START(node) = start;
