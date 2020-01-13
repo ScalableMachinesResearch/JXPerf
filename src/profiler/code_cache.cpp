@@ -298,9 +298,11 @@ CompiledMethod *CompiledMethodGroup::addMethod(jint code_size, const void *code_
 void CompiledMethodGroup::removeMethodByAddr(const void *code_addr) {
   uint64_t start_addr = (uint64_t)code_addr;
   auto it = _address_method_map.find(start_addr);
-  assert(it != _address_method_map.end()); // it should exist
-  delete it->second;
-  _address_method_map.erase(it);
+  // assert(it != _address_method_map.end()); // it should exist
+  if (it != _address_method_map.end()) { 
+    delete it->second;
+    _address_method_map.erase(it);
+  }
 }
 
 CompiledMethod * CompiledMethodGroup::getMethodByVersion(uint32_t version) {
@@ -424,9 +426,11 @@ CompiledMethod *CodeCacheManager::addMethodAndRemoveFromUncompiledSet(jmethodID 
 void CodeCacheManager::removeMethod(jmethodID method_id, const void* code_addr) {
   LockScope<SpinLock> lock_scope(&_lock);
   auto it = _method_id_map.find(method_id);
-  assert(it != _method_id_map.end());
-  it->second->removeMethodByAddr(code_addr);
-  assert(_method_range_set.remove((uint64_t)code_addr));
+  // assert(it != _method_id_map.end());
+  if (it != _method_id_map.end()){
+    it->second->removeMethodByAddr(code_addr);
+    assert(_method_range_set.remove((uint64_t)code_addr));
+  }
 }
 
 CompiledMethod *CodeCacheManager::getMethod(uint64_t addr) {
