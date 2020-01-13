@@ -65,7 +65,7 @@ static void JNICALL callbackVMInit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
   }
   std::string client_name = GetClientName();
 
-  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0 || client_name.compare(OBJECT_LEVEL_CLIENT_NAME) == 0) {
     jclass myClass = NULL;
     jmethodID main = NULL;
     jmethodID main_gc = NULL;
@@ -76,8 +76,10 @@ static void JNICALL callbackVMInit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
     main = jni->GetStaticMethodID(myClass, "register_callback", "([Ljava/lang/String;)V");
     jni->CallStaticVoidMethod(myClass, main, " ");
 
-    main_gc = jni->GetStaticMethodID(myClass, "installGCMonitoring", "([Ljava/lang/String;)V");
-    jni->CallStaticVoidMethod(myClass, main_gc, " ");
+    if(client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+        main_gc = jni->GetStaticMethodID(myClass, "installGCMonitoring", "([Ljava/lang/String;)V");
+        jni->CallStaticVoidMethod(myClass, main_gc, " ");
+    }
   }
   // UNBLOCK_SAMPLE;
 }

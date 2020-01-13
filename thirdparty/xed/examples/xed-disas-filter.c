@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ static int len_hex(char *s)
     char *p = s;
     while (isxdigit(*p))
 	p++;
-    return (int)(p - s);
+    return p - s;
 }
 
 static unsigned long get_ip(char *line)
@@ -60,7 +60,7 @@ static unsigned long get_ip(char *line)
    Optionally we look for a another hex address before prefix that gives
    the IP. */
 
-xed_uint_t disas_filter(xed_decoded_inst_t *inst, char *prefix, xed_disas_info_t *di)
+int disas_filter(xed_decoded_inst_t *inst, char *prefix, xed_disas_info_t *di)
 {
     char line[LINELEN];
 
@@ -69,11 +69,11 @@ xed_uint_t disas_filter(xed_decoded_inst_t *inst, char *prefix, xed_disas_info_t
     while (fgets(line, LINELEN, stdin)) {
 	xed_error_enum_t err;
 	char *insn = strstr(line, prefix), *ip;
-	xed_uint_t ilen;
+	int ilen;
 	char out[256];
 	unsigned long val;
 	char *endp;
-	xed_uint8_t insnbuf[IMAX];
+	unsigned char insnbuf[IMAX];
 
 	if (!insn) {
 	    fputs(line, stdout);
@@ -86,7 +86,7 @@ xed_uint_t disas_filter(xed_decoded_inst_t *inst, char *prefix, xed_disas_info_t
 	    val = strtoul(ip, &endp, 16);
 	    if (insn == endp)
 		    break;
-	    insnbuf[ilen++] = (xed_uint8_t)val;
+	    insnbuf[ilen++] = val;
 	    ip = endp;
 	} while (ilen < IMAX);
 	xed_state_t state;

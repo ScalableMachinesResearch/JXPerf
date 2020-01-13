@@ -2,7 +2,7 @@
 # -*- python -*-
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import re
 import shutil
 import copy
 import time
+import glob
 import types
 import optparse
 # sys.path is set up by calling script (mfile.py ususally)
@@ -53,10 +54,8 @@ def ex_compile_and_link(env, dag, src, objs):
 
 def mkenv():
     """External entry point: create the environment"""
-    if sys.version_info[0] == 3 and sys.version_info[1] < 4:        
-        _fatal("Need python version 3.4 or later.")
-    elif sys.version_info[0] == 2 and sys.version_info[1] < 7:        
-        _fatal("Need python version 2.7 or later.")
+    if not mbuild.check_python_version(2,7):
+        xbc.cdie("Need python 2.7.x...")
     # create an environment, parse args
     env = mbuild.env_t()
     standard_defaults = dict(    doxygen_install='',
@@ -75,7 +74,6 @@ def mkenv():
                                  dev=False,
                                  legal_header=None,
                                  encoder=True,
-                                 enc2=True,
                                  decoder=True,
                                  ld_library_path=[],
                                  ld_library_path_for_tests=[],
@@ -84,12 +82,10 @@ def mkenv():
                                  strip='strip',
                                  verbose = 1,
                                  example_linkflags='',
-                                 example_flags='',
                                  example_rpaths=[],
                                  android=False,
-                                 xed_inc_dir=[],
+                                 xed_inc_dir='',
                                  xed_lib_dir='',
-                                 xed_enc2_libs=[],
                                  xed_dir='',
                                  build_cpp_examples=False,
                                  set_copyright=False,
@@ -105,10 +101,6 @@ def xed_args(env):
                           dest="encoder",
                           action="store_false",
                           help="No encoder")
-    env.parser.add_option("--no-enc2", 
-                          dest="enc2",
-                          action="store_false",
-                          help="No enc2 encoder")
     env.parser.add_option("--no-decoder", 
                           dest="decoder",
                           action="store_false",
@@ -121,10 +113,6 @@ def xed_args(env):
                           dest="example_linkflags",
                           action="store",
                           help="Extra link flags for the examples")
-    env.parser.add_option("--example-flags", 
-                          dest="example_flags",
-                          action="store",
-                          help="Extra compilation flags for the examples")
     env.parser.add_option("--example-rpath", 
                           dest="example_rpaths",
                           action="append",
@@ -210,15 +198,11 @@ def xed_args(env):
                           help="Compile for the Pin C-runtime. Specify" +
                           " path to pin kit")
     env.parser.add_option("--lib-dir", 
-                          action='store',
+                          action="store",
                           dest="xed_lib_dir",
                           help="directory where libxed* is located.")
-    env.parser.add_option("--enc2-lib", 
-                          action='append',
-                          dest="xed_enc2_libs",
-                          help="Filenames (with paths) of the XED enc2 libraries.")
     env.parser.add_option("--inc-dir", 
-                          action="append",
+                          action="store",
                           dest="xed_inc_dir",
                           help="directory where xed generated headers are located.")
     env.parser.add_option("--xed-dir", 
@@ -238,7 +222,7 @@ def xed_args(env):
     
 def nchk(env,s):
     #null string check or not set check
-    if s not in env or len(env[s]) == 0:
+    if s not in env or env[s] == '':
        return True
     return False
  
@@ -246,15 +230,19 @@ def init(env):
     xbc.init(env)
     if nchk(env,'xed_lib_dir'):
         env['xed_lib_dir'] = '../lib'
-    if nchk(env,'xed_enc2_libs'):
-        env['xed_enc2_libs'] = mbuild.glob(env['xed_lib_dir'],'*xed-*enc2-*')
     if nchk(env,'xed_inc_dir'):
-        env['xed_inc_dir'] = ['../include']
+        env['xed_inc_dir'] = '../include' 
     if nchk(env,'xed_dir'):
         env['xed_dir'] = '..'
+    
+    fx = mbuild.join(env['xed_dir'], "include","public") # static headers
+    if os.path.exists(fx):
+       env.add_include_dir(fx)
+    fx = mbuild.join(env['xed_dir'], "include","public",'xed') 
+    if os.path.exists(fx):
+       env.add_include_dir(fx)
     env.add_include_dir( env['src_dir'] )  # examples dir
-    for inc in  env['xed_inc_dir']: 
-        env.add_include_dir( inc )
+    env.add_include_dir( env['xed_inc_dir']) # generated headers
 
 def _wk_show_errors_only():
     #True means show errors only when building.
@@ -263,23 +251,21 @@ def _wk_show_errors_only():
     return True # show errors only.
 
 
+
 def _add_libxed_rpath(env):
-   """Make example tools refer to the libxed.so from the lib directory"""
-   if env['shared'] and env.on_linux() and not env['android']:
-       env['LINKFLAGS'] += " -Wl,-rpath,'$ORIGIN/../lib'"
+   """Make example tools refer to the libxed.so from the lib directory
+   if doing an install"""
+   if not env['shared']:
+      return
+   if not env.on_linux():
+      return 
+   if env['android']:
+      return 
+   if xbc.installing(env):
+      env['LINKFLAGS'] += " -Wl,-rpath,'$ORIGIN/../lib'"
+   else:
+      env['LINKFLAGS'] += " -Wl,-rpath,'$ORIGIN/..'"
 
-
-def build_asmparse(env, dag, otherobj):
-    srcs = env.src_dir_join(['xed-asmparse.c'])
-    objs = env.compile(dag, srcs)
-
-    exe = ex_compile_and_link(env,
-                              dag,
-                              env.src_dir_join('xed-asmparse-main.c'),
-                              objs + otherobj + [env['link_libxed']])
-    return exe
-
-      
 
 def build_examples(env, work_queue):
     """Build the examples"""
@@ -292,8 +278,8 @@ def build_examples(env, work_queue):
             env.add_to_var('example_linkflags',
                                    '-Wl,-rpath,{}'.format(d))
     env.add_to_var('LINKFLAGS', env['example_linkflags'])
-    env.add_to_var('CCFLAGS', env['example_flags'])
-    env.add_to_var('CXXFLAGS', env['example_flags'])
+    # put the examples in their own subdirectory
+    env['build_dir'] = mbuild.join(env['build_dir'],'examples')
     mbuild.cmkdir(env['build_dir'])
 
     link_libxed = env['link_libxed']
@@ -328,13 +314,7 @@ def build_examples(env, work_queue):
                           'xed-disas-hex.c',
                           'xed-symbol-table.c']
     if env.on_windows() and env['set_copyright']:
-        # AUTOMATICALLY UPDATE YEAR IN THE RC FILE
-        year = time.strftime("%Y")
-        lines = open(env.src_dir_join('xed-rc-template.txt')).readlines()
-        lines = [ re.sub('%%YEAR%%',year,x) for x in lines ]
-        xbc.write_file(env.src_dir_join('xed.rc'), lines)
         xed_cmdline_files.append("xed.rc")
-        
     extra_libs = []    
     if env['decoder']:
 
@@ -375,19 +355,9 @@ def build_examples(env, work_queue):
     mbuild.msgb("CMDLINE", xed_cmdline)
     example_exes.append(xed_cmdline)
 
-    if env['encoder']:
-        exe = build_asmparse(cenv, examples_dag, cc_shared_objs)
-        example_exes.append(exe)
-        
-
     ild_examples = []
     other_c_examples = []
-    enc2_examples = []
     small_examples = ['xed-size.c']
-    if env['enc2']:
-        enc2_examples += [ 'xed-enc2-1.c',
-                           'xed-enc2-2.c',
-                           'xed-enc2-3.c' ]
     if env['encoder']:
        small_examples += ['xed-ex5-enc.c']
        other_c_examples += ['xed-ex3.c']
@@ -408,7 +378,6 @@ def build_examples(env, work_queue):
                             'xed-ex8.c',
                             'xed-ex-cpuid.c',
                             'xed-tables.c',
-                            'xed-find-special.c',                            
                             'xed-dll-discovery.c']
 
     # compile & link other_c_examples
@@ -431,13 +400,6 @@ def build_examples(env, work_queue):
                                                 examples_dag,
                                                 example,
                                                 [ link_libxed ]))
-    
-    for example in env.src_dir_join(enc2_examples):
-        example_exes.append(ex_compile_and_link(  env_c,
-                                                  examples_dag,
-                                                  example,
-                                                  env['xed_enc2_libs'] + [link_libxed]  ))
-        
     if mbuild.verbose(3):
         mbuild.msgb("ALL EXAMPLES", "\n\t".join(example_exes))
 
@@ -481,7 +443,7 @@ def examples_work(env):
     
     work_queue = mbuild.work_queue_t(env['jobs']) 
 
-    xbc.get_libxed_names(env)
+    xbc.get_libxed_names(env, work_queue)
     retval = build_examples(env, work_queue)
     end_time=mbuild.get_time()
     mbuild.msgb("EXAMPLES BUILD ELAPSED TIME",

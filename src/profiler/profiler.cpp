@@ -18,6 +18,7 @@
 #include "x86-misc.h"
 #include "context-pc.h" 
 #include "safe-sampling.h"
+#include "allocation_ins.h"
 
 #define APPROX_RATE (0.01)
 #define MAX_FRAME_NUM (128)
@@ -31,9 +32,10 @@ static SpinLock lock_map;
 SpinLock tree_lock;
 interval_tree_node *splay_tree_root = NULL;
 static std::unordered_map<Context*, Context*> map = {};
+thread_local std::unordered_map<Context*, per_context_info_t> allocation_callback_ctxt={};
 
 uint64_t GCCounter = 0;
-__thread uint64_t localGCCounter = 0;
+thread_local uint64_t localGCCounter = 0;
 
 uint64_t grandTotWrittenBytes = 0;
 uint64_t grandTotLoadedBytes = 0;
@@ -44,20 +46,24 @@ uint64_t grandTotOldBytes = 0;
 uint64_t grandTotOldAppxBytes = 0;
 uint64_t grandTotL1Cachemiss = 0;
 uint64_t grandTotAllocTimes = 0;
+uint64_t grandTotSameValueTimes = 0;
+uint64_t grandTotDiffValueTimes = 0;
 
-__thread uint64_t totalWrittenBytes = 0;
-__thread uint64_t totalLoadedBytes = 0;
-__thread uint64_t totalUsedBytes = 0;
-__thread uint64_t totalDeadBytes = 0;
-__thread uint64_t totalNewBytes = 0;
-__thread uint64_t totalOldBytes = 0;
-__thread uint64_t totalOldAppxBytes = 0;
-__thread uint64_t totalL1Cachemiss = 0;
-__thread uint64_t totalAllocTimes = 0;
+thread_local uint64_t totalWrittenBytes = 0;
+thread_local uint64_t totalLoadedBytes = 0;
+thread_local uint64_t totalUsedBytes = 0;
+thread_local uint64_t totalDeadBytes = 0;
+thread_local uint64_t totalNewBytes = 0;
+thread_local uint64_t totalOldBytes = 0;
+thread_local uint64_t totalOldAppxBytes = 0;
+thread_local uint64_t totalL1Cachemiss = 0;
+thread_local uint64_t totalAllocTimes = 0;
+thread_local uint64_t totalSameValueTimes = 0;
+thread_local uint64_t totalDiffValueTimes = 0;
 
-__thread void *prevIP = (void *)0;
+thread_local void *prevIP = (void *)0;
 
-// __thread uint64_t sampleCnt = 0;
+// thread_local uint64_t sampleCnt = 0;
 // uint64_t totalSampleCnt = 0;
 
 namespace {
@@ -97,7 +103,7 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
 }
 
 
-void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metric_id1, int metric_id2) {
+void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metric_id1, int metric_id2, int metric_id3) {
     if (!sampleData->isPrecise || !sampleData->addr) return;
     
     void *sampleIP = (void *)(sampleData->ip);
@@ -119,6 +125,12 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     // data-centric analysis
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
         DataCentricAnalysis(sampleData, uCtxt, method_id, method_version, threshold, metric_id2);
+        return;
+    }
+
+    // object-level redundancy analysis
+    if (clientName.compare(OBJECT_LEVEL_CLIENT_NAME) == 0) {
+        ObjectLevelRedundancy(sampleData, uCtxt, method_id, method_version, metric_id2, metric_id3);
         return;
     }
 
@@ -168,16 +180,211 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
 
     if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0 && accessType != LOAD) {
         totalWrittenBytes += accessLen * threshold;
-        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metric_id1, false);
+        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, false, false, 0, nullptr, 0, nullptr, metric_id1, 0, 0);
     } else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0 && accessType != LOAD) {
         totalWrittenBytes += accessLen * threshold;
-        WP_Subscribe(sampleAddr, watchLen, WP_WRITE, accessLen, watchCtxt, metric_id1, true);
+        WP_Subscribe(sampleAddr, watchLen, WP_WRITE, accessLen, watchCtxt, true, false, 0, nullptr, 0, nullptr, metric_id1, 0, 0);
     } else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0 && accessType != STORE) { 
         totalLoadedBytes += accessLen * threshold;
-        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, metric_id1, true);
+        WP_Subscribe(sampleAddr, watchLen, WP_RW, accessLen, watchCtxt, true, false, 0, nullptr, 0, nullptr, metric_id1, 0, 0);
     } else {
         ERROR("Unknown client name: %s or mismatch between the client name: %s and the sampled instruction: %p", clientName.c_str(), clientName.c_str(), sampleIP);
     }
+}
+
+void Profiler::ObjectLevelRedundancy(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, int metric_id2, int metric_id3) {
+    int accessLen;
+    AccessType accessType;
+    FloatType floatType;
+    xed_operand_element_xtype_enum_t xx_type;
+    if(get_mem_access_length_and_type_address((void*)(sampleData->ip), (uint32_t*)(&accessLen), &accessType, &floatType, 0, 0, &xx_type) == false)
+        return;
+    if (accessType == UNKNOWN || accessLen == 0) return;
+    int watchLen = GetFloorWPLength(accessLen);   
+
+	Context *ctxt_allocate = nullptr;
+    void* startaddress;
+    tree_lock.lock();
+    interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void*)(sampleData->addr), &startaddress);
+    tree_lock.unlock();
+
+	if (p != NULL) {
+        Context *ctxt = p->node_ctxt; 
+		std::stack<Context *> ctxt_stack;
+		while (ctxt != nullptr) {
+			ctxt_stack.push(ctxt);
+			ctxt = ctxt->getParent();
+		}
+
+		if (!ctxt_stack.empty()) ctxt_stack.pop(); // pop out the root
+		
+		ctxt = nullptr;
+		ContextTree *ctxt_tree = reinterpret_cast<ContextTree *> (TD_GET(context_state));
+		while (!ctxt_stack.empty()) {
+			ContextFrame ctxt_frame = ctxt_stack.top()->getFrame();
+			if (ctxt == nullptr) ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
+			else ctxt = ctxt_tree->addContext(ctxt, ctxt_frame);
+			ctxt_stack.pop();
+		}
+
+        ctxt_allocate = constructContext(_asgct, uCtxt, sampleData->ip, ctxt, method_id, method_version);
+
+		if(allocation_callback_ctxt[ctxt].first_process || allocation_callback_ctxt[ctxt].avail_wp == 0) {
+            uint64_t offset = sampleData->addr - (uint64_t)startaddress;
+            wp_info_t wp_info;
+            wp_info.offset = offset;
+            wp_info.value = (void*)(sampleData->addr);
+            wp_info.type = xx_type;
+            allocation_callback_ctxt[ctxt].watchpoint_info.push_back(wp_info);
+            allocation_callback_ctxt[ctxt].avail_wp++;
+        }
+		else {
+            std::vector<wp_info_t>::iterator it = allocation_callback_ctxt[ctxt].watchpoint_info.begin();
+            allocation_callback_ctxt[ctxt].sample_count++;
+            if(allocation_callback_ctxt[ctxt].sample_count <= allocation_callback_ctxt[ctxt].avail_wp) {
+                switch(xx_type) {
+                    case XED_OPERAND_XTYPE_F32:
+                    case XED_OPERAND_XTYPE_F64:
+                    case XED_OPERAND_XTYPE_I16:
+                    case XED_OPERAND_XTYPE_I32:
+                    case XED_OPERAND_XTYPE_I64:
+                    case XED_OPERAND_XTYPE_I8:
+                    case XED_OPERAND_XTYPE_INT:
+                    case XED_OPERAND_XTYPE_U16:
+                    case XED_OPERAND_XTYPE_U32:
+                    case XED_OPERAND_XTYPE_U64:
+                    case XED_OPERAND_XTYPE_U8: {
+                        uint64_t sampledaddr_vechead = (uint64_t)startaddress + (*it).offset;
+                        void* value_vechead = (*it).value;
+                        int type_vechead = (*it).type;
+                        WP_Subscribe((void*)sampledaddr_vechead, watchLen, WP_RW, accessLen, nullptr, false, true, xx_type, value_vechead, type_vechead, (void*)ctxt_allocate, 0, metric_id2, metric_id3);
+                    }
+                    default:
+                        break;
+                }
+                uint64_t offset = sampleData->addr - (uint64_t)startaddress;
+                wp_info_t wp_info;
+                wp_info.offset = offset;
+                wp_info.value = (void*)(sampleData->addr);
+                wp_info.type = xx_type;
+                allocation_callback_ctxt[ctxt].watchpoint_info.push_back(wp_info);
+                allocation_callback_ctxt[ctxt].watchpoint_info.erase(allocation_callback_ctxt[ctxt].watchpoint_info.begin());
+            }
+            else {
+                allocation_callback_ctxt[ctxt].avail_wp++;
+                uint64_t offset = sampleData->addr - (uint64_t)startaddress;
+                wp_info_t wp_info;
+                wp_info.offset = offset;
+                wp_info.value = (void*)(sampleData->addr);
+                wp_info.type = xx_type;
+                allocation_callback_ctxt[ctxt].watchpoint_info.push_back(wp_info);
+            }
+        }
+	}
+}
+
+WP_TriggerAction_t Profiler::OnObjectLevelWatchPoint(WP_TriggerInfo_t *wpi) {
+    if (!profiler_safe_enter()) return WP_DISABLE;
+    
+    bool issame = false;
+    int accessLen;
+    AccessType accessType;
+    FloatType floatType;
+    xed_operand_element_xtype_enum_t xx_type;
+    void* addr = (void*)-1;
+    if(get_mem_access_length_and_type_address(wpi->pc, (uint32_t*)(&accessLen), &accessType, &floatType, wpi->uCtxt, &addr, &xx_type) == false) {
+        profiler_safe_exit();
+        return WP_DISABLE;
+    }
+
+    if(xx_type == XED_OPERAND_XTYPE_F32 && wpi->type_vechead == XED_OPERAND_XTYPE_F32) {
+        float new_value = *(float*)(wpi->data);
+        float old_value = *(float*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_F64 && wpi->type_vechead == XED_OPERAND_XTYPE_F64) {
+        double new_value = *(double*)(wpi->data);
+        double old_value = *(double*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_I16 && wpi->type_vechead == XED_OPERAND_XTYPE_I16) {
+        int16_t new_value = *(int16_t*)(wpi->data);
+        int16_t old_value = *(int16_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_I32 && wpi->type_vechead == XED_OPERAND_XTYPE_I32) {
+        int32_t new_value = *(int32_t*)(wpi->data);
+        int32_t old_value = *(int32_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_I64 && wpi->type_vechead == XED_OPERAND_XTYPE_I64) {
+        int64_t new_value = *(int64_t*)(wpi->data);
+        int64_t old_value = *(int64_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_I8 && wpi->type_vechead == XED_OPERAND_XTYPE_I8) {
+        int8_t new_value = *(int8_t*)(wpi->data);
+        int8_t old_value = *(int8_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_INT && wpi->type_vechead == XED_OPERAND_XTYPE_INT) {
+        int new_value = *(int*)(wpi->data);
+        int old_value = *(int*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_U16 && wpi->type_vechead == XED_OPERAND_XTYPE_U16) {
+        uint16_t new_value = *(uint16_t*)(wpi->data);
+        uint16_t old_value = *(uint16_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_U32 && wpi->type_vechead == XED_OPERAND_XTYPE_U32) {
+        uint32_t new_value = *(uint32_t*)(wpi->data);
+        uint32_t old_value = *(uint32_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_U64 && wpi->type_vechead == XED_OPERAND_XTYPE_U64) {
+        uint64_t new_value = *(uint64_t*)(wpi->data);
+        uint64_t old_value = *(uint64_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+    else if(xx_type == XED_OPERAND_XTYPE_U8 && wpi->type_vechead == XED_OPERAND_XTYPE_U8) {
+        uint8_t new_value = *(uint8_t*)(wpi->data);
+        uint8_t old_value = *(uint8_t*)(wpi->value_vechead);
+        if(new_value == old_value)
+            issame = true;
+    }
+
+	Context* ctxt_allocate = (Context*)wpi->allocateCtxt;
+	if (ctxt_allocate != nullptr) {
+		metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
+		if (metrics == nullptr){
+			metrics = new metrics::ContextMetrics();
+			ctxt_allocate->setMetrics(metrics);
+		}
+		metrics::metric_val_t metric_val;
+		metric_val.i = 1;
+		if(issame) {
+            totalSameValueTimes += 1;
+			assert(metrics->increment(wpi->metric_id2, metric_val));
+        }
+		else  {
+            totalDiffValueTimes += 1;
+			assert(metrics->increment(wpi->metric_id3, metric_val));
+        }
+	}
+
+    profiler_safe_exit();
+    return WP_DISABLE;
 }
 
 void Profiler::DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2) {
@@ -286,7 +493,7 @@ WP_TriggerAction_t Profiler::OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpt) {
     FloatType *floatType = 0;
     void *addr = (void *)-1;
     
-    if (false == get_mem_access_length_and_type_address(patchedIP, (uint32_t *)(&accessLen), &accessType, floatType, wpt->uCtxt, &addr)) {
+    if (false == get_mem_access_length_and_type_address(patchedIP, (uint32_t *)(&accessLen), &accessType, floatType, wpt->uCtxt, &addr, 0)) {
         profiler_safe_exit();
         return WP_DISABLE;
     }
@@ -348,7 +555,7 @@ WP_TriggerAction_t Profiler::DetectRedundancy(WP_TriggerInfo_t *wpt, jmethodID m
     FloatType floatType = ELEM_TYPE_FLOAT16;
     void *addr = (void *)-1;
 
-    if (false == get_mem_access_length_and_type_address(wpt->pc, (uint32_t *)(&accessLen), &accessType, &floatType, wpt->uCtxt, &addr)) return WP_DISABLE;
+    if (false == get_mem_access_length_and_type_address(wpt->pc, (uint32_t *)(&accessLen), &accessType, &floatType, wpt->uCtxt, &addr, 0)) return WP_DISABLE;
     if (accessLen == 0) return WP_DISABLE;
     
     if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) {
@@ -607,6 +814,8 @@ void Profiler::threadStart() {
     totalOldAppxBytes = 0;
     totalL1Cachemiss = 0;
     totalAllocTimes = 0;
+    totalSameValueTimes = 0;
+    totalDiffValueTimes = 0;
 
     ThreadData::thread_data_alloc();
     ContextTree *ct_tree = new(std::nothrow) ContextTree();
@@ -635,6 +844,7 @@ void Profiler::threadStart() {
     if (clientName.compare(DEADSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnDeadStoreWatchPoint));
     else if (clientName.compare(SILENTSTORE_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedStoreWatchPoint));
     else if (clientName.compare(SILENTLOAD_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnRedLoadWatchPoint));
+    else if (clientName.compare(OBJECT_LEVEL_CLIENT_NAME) == 0) assert(WP_ThreadInit(Profiler::OnObjectLevelWatchPoint));
     else if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) { 
         ERROR("Can't decode client %s", clientName.c_str());
         assert(false);
@@ -646,6 +856,7 @@ void Profiler::threadStart() {
 
 void Profiler::threadEnd() {
     PerfManager::closeEvents();
+    //if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0 && clientName.compare(OBJECT_LEVEL_CLIENT_NAME) != 0) {
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
         WP_ThreadTerminate();
     }
@@ -689,7 +900,7 @@ void Profiler::threadEnd() {
 #endif
     
     //clean up the context state
-    delete ctxt_tree;
+    //delete ctxt_tree;
     TD_GET(context_state) = nullptr;
 
 #ifdef PRINT_PMU_INS
@@ -719,6 +930,8 @@ void Profiler::threadEnd() {
     __sync_fetch_and_add(&grandTotOldAppxBytes, totalOldAppxBytes);
     __sync_fetch_and_add(&grandTotL1Cachemiss, totalL1Cachemiss);
     __sync_fetch_and_add(&grandTotAllocTimes, totalAllocTimes);
+    __sync_fetch_and_add(&grandTotSameValueTimes, totalSameValueTimes);
+    __sync_fetch_and_add(&grandTotDiffValueTimes, totalDiffValueTimes);
 }
 
 
@@ -748,5 +961,9 @@ void Profiler::output_statistics() {
         _statistics_file << clientName << std::endl;
         _statistics_file << grandTotAllocTimes << std::endl;
         _statistics_file << grandTotL1Cachemiss << std::endl;
+    } else if (clientName.compare(OBJECT_LEVEL_CLIENT_NAME) == 0) {
+        _statistics_file << clientName << std::endl;
+        _statistics_file << grandTotSameValueTimes << std::endl;
+        _statistics_file << grandTotDiffValueTimes << std::endl;
     }
 }

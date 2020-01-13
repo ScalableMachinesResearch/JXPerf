@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -219,7 +219,7 @@ XED_DLL_EXPORT int xed_simple_flag_print(const xed_simple_flag_t* p, char* buf, 
 
 /// @ingroup FLAGS    
 /// Return the flags as a mask
-static XED_INLINE unsigned int xed_flag_set_mask(const xed_flag_set_t* p) {
+static XED_INLINE int xed_flag_set_mask(const xed_flag_set_t* p) {
     return p->flat; // FIXME: could mask out the X87 flags
 }
 

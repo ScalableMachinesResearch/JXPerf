@@ -2,7 +2,7 @@
 # -*- python -*-
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -61,19 +61,20 @@ from __future__ import print_function
 import os
 import sys
 import copy
+import types
 import glob
 import re
 import optparse
 
 def find_dir(d):
-    directory = os.getcwd()
+    dir = os.getcwd()
     last = ''
-    while directory != last:
-        target_directory = os.path.join(directory,d)
-        if os.path.exists(target_directory):
-            return target_directory
-        last = directory
-        directory = os.path.split(directory)[0]
+    while dir != last:
+        target_dir = os.path.join(dir,d)
+        if os.path.exists(target_dir):
+            return target_dir
+        last = dir
+        (dir,tail) = os.path.split(dir)
     return None
 
 mbuild_install_path = os.path.join(os.path.dirname(sys.argv[0]), '..', 'mbuild')
@@ -84,7 +85,7 @@ try:
    import mbuild
 except:
    sys.stderr.write("\nERROR(generator.py): Could not find mbuild. " +
-                    "Should be a sibling of the xed directory.\n\n")
+                    "Should be a sibling of the xed2 directory.\n\n")
    sys.exit(1)
 
 xed2_src_path = os.path.join(os.path.dirname(sys.argv[0]))
@@ -94,14 +95,12 @@ sys.path=  [ xed2_src_path ]  + sys.path
 sys.path=  [ os.path.join(xed2_src_path,'pysrc') ]  + sys.path
 
 from genutil import *
-import genutil
 import operand_storage
-import slash_expand
-import flag_gen
+import slash_expand, flag_gen
 from verbosity import *
 import opnds
 import opnd_types
-import cpuid_rdr
+import genutil
 
 send_stdout_message_to_file = False
 if send_stdout_message_to_file:
@@ -119,7 +118,6 @@ import ctables
 import ild
 import refine_regs
 import classifier
-#import encgen
 
 #####################################################################
 ## OPTIONS
@@ -314,7 +312,7 @@ slash_macro_pattern = re.compile(r'([a-z][/][0-9]{1,2})')
 nonterminal_string = r'([A-Z][a-zA-Z0-9_]*)[(][)]'
 
 parens_to_end_of_line = re.compile(r'[(][)].*::.*$') # with double colon
-lookupfn_w_args_pattern =  re.compile(r'[\[][a-z]+]')
+lookupfn_w_args_pattern =  re.compile(r'[[][a-z]+]')
 #nonterminal_start_pattern=re.compile(r'^' + nonterminal_string + r'\s*::')
 nonterminal_start_pattern=re.compile(r'::')
 nonterminal_pattern=re.compile(nonterminal_string)
@@ -342,7 +340,7 @@ all_lower_case_pattern = re.compile(r'^[a-z]+$')
 
 
 pattern_binding_pattern = re.compile(
-               r'(?P<name>[A-Za-z_0-9]+)[\[](?P<bits>[A-Za-z01_]+)]')
+               r'(?P<name>[A-Za-z_0-9]+)[[](?P<bits>[A-Za-z01_]+)]')
 uppercase_pattern = re.compile(r'[A-Z]')
 
 
@@ -412,7 +410,7 @@ class nonterminal_dict_t(object):
          return self.nonterminal_info[nt_name]
       die("Did not find " + nt_name + " in the nonterminal dictionary.")
          
-   def add_to_dict(self,short_nt_name, nt_type=None):
+   def add_to_dict(self,short_nt_name, nt_type):
       msge("Adding " + short_nt_name + " to nonterminal dict")
       #nonterminal_info_t has {name, type, start_node, encode, decoder}
       new_nt = nonterminal_info_t(short_nt_name, nt_type)
@@ -578,6 +576,10 @@ class state_info_t(object):
 
 ############################################################################
       
+def blank_line(line):
+   if line == '':
+      return False
+   return True
 
 def pad_pattern(pattern):
    "pad it to a multiple of 8 bits"
@@ -595,7 +597,7 @@ def read_dict_spec(fn):
       die("Could not read file: " + fn)
     lines = open(fn,'r').readlines()
     lines = map(no_comments, lines)
-    lines = list(filter(genutil.blank_line, lines))
+    lines = list(filter(blank_line, lines))
     for line in lines:
         wrds = line.split()
         key = wrds[0]
@@ -619,7 +621,7 @@ def read_state_spec(fn):
       die("Could not read file: " + fn)
    lines = open(fn,'r').readlines()
    lines = map(no_comments, lines)
-   lines = list(filter(genutil.blank_line, lines))
+   lines = list(filter(blank_line, lines))
    for line in lines:
       ## remove comment lines
       #line = no_comments(line)
@@ -1043,7 +1045,7 @@ class partitionable_info_t(object):
    def __str__(self):
       return self.dump_str()
    
-   def dump_str(self, pad='',brief=None):
+   def dump_str(self, pad=''):
       return self.input_str 
 
    def dump_structured(self,pad=''):
@@ -1119,7 +1121,6 @@ class instruction_info_t(partitionable_info_t):
       self.flags_input = None
       self.flags_info = None  # flag_gen.flags_info_t class
       
-      self.iform = None
       self.iform_input = None
       self.iform_num = None
       self.iform_enum = None
@@ -1139,24 +1140,6 @@ class instruction_info_t(partitionable_info_t):
             self.add_attribute('STACKPOP%d' % (memop_index))
             return
       die("Did not find stack push/pop operand")
-
-   def is_vex(self):
-       for bit in self.ipattern.bits: # bit_info_t
-           #print("XXR: {} {}  {} {} {}".format(self.iclass, bit.btype, bit.token, bit.test, bit.requirement))
-           if bit.btype == 'operand' and  bit.token == 'VEXVALID' and bit.requirement == 1 and bit.test == 'eq':
-               return True
-       return False
-   def is_evex(self):
-       for bit in self.ipattern.bits: # bit_info_t
-           if bit.btype == 'operand' and bit.token == 'VEXVALID' and bit.requirement == 2 and bit.test == 'eq':
-               return True
-       return False
-   def get_map(self):
-       for bit in self.ipattern.bits: # bit_info_t
-           if bit.token == 'MAP' and bit.test == 'eq':
-               return bit.requirement
-       return 0
-
 
    def dump_structured(self):
        """Return a list of strings representing the instruction in a
@@ -1256,8 +1239,6 @@ class instruction_info_t(partitionable_info_t):
             (token, rest ) = line.split(':',1)
             token = token.strip()
             rest = rest.strip()
-            if rest.startswith(':'):
-                die("Double colon error {}".format(line))
 
             # Certain tokens can be duplicated. We allow for triples
             # of (pattern,operands,iform). The iform is optional.  If
@@ -1318,7 +1299,7 @@ class instruction_info_t(partitionable_info_t):
                   # extra pattern.
                   if len(self.extra_operands) == 0:
                      die("Need to have a PATTERN line before the " + 
-                         "OPERANDS line for " + self.iclass)
+                         "OPERANDS line for " + ii.iclass)
                   self.extra_operands[-1] = rest.split()
                else:
                   self.operands_input = rest.split()
@@ -1345,7 +1326,7 @@ class instruction_info_t(partitionable_info_t):
                if filling_extra:
                   if len(self.extra_iforms_input) == 0:
                      die("Need to have a PATTERN line before " +
-                         "the IFORM line for " + self.iclass)
+                         "the IFORM line for " + ii.iclass)
                   self.extra_iforms_input[-1] = rest
                else:
                   self.iform_input = rest
@@ -1712,10 +1693,11 @@ def read_input(agi, lines):
                                      lines,
                                      agi.common.state_bits)
       return nlines
-   return read_flat_input(agi, 
-                          agi.common.options,parser,
-                          lines,
-                          agi.common.state_bits)
+   else: 
+      return read_flat_input(agi, 
+                             agi.common.options,parser,
+                             lines,
+                             agi.common.state_bits)
 
 def read_structured_input(agi, options, parser, lines, state_dict):
    msge("read_structured_input")
@@ -1931,8 +1913,6 @@ class graph_node(object):
       # The capture function_object_t for the operands we need to
       # capture at this node.
       self.capture_function = None
-      
-      self.trimmed_values = None
       
    def is_nonterminal(self):
       if self.nonterminal != None:
@@ -2341,7 +2321,8 @@ def at_end_of_instructions(ilist, bitpos):
          print_node(ilist)
          #die("Dying")
          return -1 # problem: some done, some not done
-      return 1 # all is well, all done
+      else:
+         return 1 # all is well, all done
    return 0 # not done yet
 
 def no_dont_cares(instructions, bitpos):
@@ -3025,7 +3006,7 @@ def collect_isa_sets(agi):
 
 
 
-def collect_tree_depth(node, depths, depth=0):
+def collect_tree_depth(node, depths={}, depth=0):
    """Collect instruction field data for enumerations"""
 
    cdepth = depth + 1
@@ -3310,8 +3291,8 @@ def cmp_invalid_vtuple(vt1,vt2):  #FIXME:2017-06-10:PY3 port. No longer used
          return 0
       elif v1 > v2:
          return 1
-      return -1
-  
+      else:
+         return -1
    if t1 == 'INVALID':
       return -1
    if t2 == 'INVALID':
@@ -3421,10 +3402,7 @@ def emit_iclass_rep_ops(agi):
     # fill in the no-rep info for each object
     for o in repobjs:
         o.no_rep_iclass = re.sub(r'REP(E|NE)?_', '', o.iclass)
-        if o.no_rep_iclass in agi.iclasses_enum_order:
-            o.no_rep_indx  = agi.iclasses_enum_order.index(o.no_rep_iclass)
-        else:
-            o.no_rep_indx  = 0  # invalid
+        o.no_rep_indx  = agi.iclasses_enum_order.index(o.no_rep_iclass)
 
     # make a list of keys for the norep-to-whatever hash functions
     no_rep_keys = uniqueify( [x.no_rep_indx for x in repobjs])
@@ -3708,10 +3686,11 @@ def compute_iform(options,ii, operand_storage_dict):
       if operand.internal:
          if viform():
             msge("IFORM SKIPPING INTERNAL %s" % (operand.name))
+         pass
       elif operand.visibility == 'SUPPRESSED':
          if viform():
             msge("IFORM SKIPPING SUPPRESSED %s" % (operand.name))
-
+         pass
       elif operand.type == 'nt_lookup_fn':
          s = operand.lookupfn_name # .upper()
          s = re.sub(r'_SB','',s) 
@@ -3925,6 +3904,9 @@ def make_one_attribute_equation(attr_grp,basis):
     one = '((xed_uint64_t)1)'
     attr_string_or = None
     for a in attr_grp:
+        if vattr():
+            msgb("ADDING ATTRIBUTE", "%s for %s" % ( a, ii.iclass))
+
         if basis:
             rebase = "(%s<<(XED_ATTRIBUTE_%s-%d))" % (one, a, basis)
         else:
@@ -4611,7 +4593,8 @@ def renumber_nodes_sub(options,node):
    node.id = renum_node_id
    # recur
    for nxt in node.next.values():
-      renumber_nodes_sub(options,nxt)
+      node_id = renumber_nodes_sub(options,nxt)
+
 
 
 def merge_child_nodes(options,node):
@@ -4803,6 +4786,45 @@ class bit_group_info_t(object):
          lst.append('ntadders:'+self.position_nonterminal_adders)
       s = '/'.join(lst)
       return s
+
+def code_gen_extract_sub_runs_old(sub_runs, vname, start_clean = True):
+   """Write code that assigns bits to vname based on the sub runs.  If
+   start_clean is false, we OR in our first stuff. Otherwise we do an
+   assignment for the very first bits extracted."""
+   
+   # position is the position of the start of the bit run, treated as
+   # a string, so shifts must be adjusted for the width of the run.
+
+   eol  = ';\n'
+   nl  = '\n'
+   if start_clean:
+      first = True
+   else:
+      first = False
+   s = ''
+   
+   for (bit,count,position_str, nonterminal_addr) in sub_runs:
+      print("PROCESSING SUBRUN (%s, %d, %s, %s)" % (
+          bit, count ,position_str, nonterminal_addr))
+      # control whether or not we do an assignment or and |= in to our
+      # dest var c.
+      if first:
+         bar = ''
+         first = False
+      else:
+         bar = '|'
+         # must shift last "c" by the amount we are or-ing in on this iteration
+         t += "%s=%s<<%s%s" % (vname, vname, str(count), eol)
+         s += t
+         print("ADDING SHIFT OF PREV STUFF: %s" % t)
+         
+      sindex =  str(position_str)
+      if nonterminal_addr != '':
+         sindex += nonterminal_addr
+      sindex  += '+xed_decoded_inst_nonterminal_bitpos_start(xds)'
+      s += "%s %s=xed_decoded_inst_read_any_bits(xds,%s,%s)%s" % (
+          vname, bar, sindex, str(count), eol )
+   return s
 
    
 def print_bit_groups(bit_groups, s=''):
@@ -5069,11 +5091,6 @@ class all_generator_info_t(object):
       self.categories = []
       self.extensions = []
       self.attributes = []
-      
-      # for emitting defines with limits
-      self.max_iclass_strings = 0
-      self.max_convert_patterns = 0
-      self.max_decorations_per_operand = 0
 
       # this is the iclasses in the order of the enumeration for us in
       # initializing other structures.
@@ -5105,10 +5122,6 @@ class all_generator_info_t(object):
       
       self.data_table_file=None
       self.operand_sequence_file=None
-
-      # set by scan_maps
-      self.max_map_vex = 0
-      self.max_map_evex = 0
       
       # dict "iclass:extension" -> ( iclass,extension, 
       #                               category, iform_enum, properties-list)
@@ -5206,9 +5219,6 @@ class all_generator_info_t(object):
              self.src_files.append(f)
 
    def dump_generated_files(self):
-       """For mbuild dependence checking, we need an accurate list of the
-          files the generator created. This file is read by xed_mbuild.py"""
-       
        output_file_list = mbuild.join(self.common.options.gendir, 
                                       "DECGEN-OUTPUT-FILES.txt")
        f = base_open_file(output_file_list,"w")
@@ -5219,7 +5229,8 @@ class all_generator_info_t(object):
    def mk_fn(self,fn):
       if True: #MJC2006-10-10
          return fn
-      return self.real_mk_fn(fn)
+      else:
+         return self.real_mk_fn(fn)
 
    def real_mk_fn(self,fn):
       return os.path.join(self.common.options.gendir,fn)
@@ -5248,18 +5259,9 @@ class all_generator_info_t(object):
       if start:
           fp.start()
       return fp
+   
 
-
-   def scan_maps(self):
-       for generator in self.generator_list:
-           for ii in generator.parser_output.instructions:
-               if genutil.field_check(ii, 'iclass'):
-                   if ii.is_vex():
-                       self.max_map_vex = max(self.max_map_vex, ii.get_map())
-                   elif ii.is_evex():
-                       self.max_map_evex = max(self.max_map_evex, ii.get_map())
-
-                        
+      
    def code_gen_table_sizes(self):
       """Write the file that has the declarations of the tables that we
       fill in in the generator"""
@@ -5320,9 +5322,6 @@ class all_generator_info_t(object):
       fi.add_code("#define XED_MAX_DECORATIONS_PER_OPERAND %d" % 
                   (self.max_decorations_per_operand))
 
-      self.scan_maps()
-      fi.add_code("#define XED_MAX_MAP_VEX  {}".format(self.max_map_vex))
-      fi.add_code("#define XED_MAX_MAP_EVEX {}".format(self.max_map_evex))
       fi.close()
 
       
@@ -5734,7 +5733,20 @@ def call_chipmodel(agi):
 
 ################################################
 def read_cpuid_mappings(fn):
-    return cpuid_rdr.read_file(fn)
+    lines = open(fn,'r').readlines()
+    lines = map(no_comments, lines)
+    lines = list(filter(blank_line, lines))
+    d = {} # isa-set to list of cpuid records
+    for line in lines:
+        wrds = line.split(':')
+        isa_set = wrds[0].strip()
+        #cpuid_bits = re.sub('[.]','_',wrds[1].upper()).split()
+        cpuid_bits = wrds[1].upper().split()
+        if isa_set in d:
+            die("Duplicate cpuid definition for isa set. isa-set={} old ={} new={}".format(
+                isa_set, d[isa_set], cpuid_bits))
+        d[isa_set] = cpuid_bits
+    return d
 
 def make_cpuid_mappings(agi,mappings):
 
@@ -5924,7 +5936,7 @@ def emit_reg_class_mappings(options, regs_list):
       if ri.max_enclosing_reg_32:
           m32 = ri.max_enclosing_reg_32
       else:
-          m32 = 'INVALID' # used for 64b GPRs
+          m32 = ri.max_enclosing_reg
 
       s = 'xed_largest_enclosing_register_array_32[XED_REG_%s]= XED_REG_%s' % (
           ri.name, m32)
@@ -6393,16 +6405,20 @@ def main():
    if not os.path.exists(agi.common.options.gendir):
       die("Need a subdirectory called " + agi.common.options.gendir)
    
+   print_resource_usage('main.1')
    gen_operand_storage_fields(options,agi)
    
+   print_resource_usage('main.2')
    gen_regs(options,agi)
 
+   print_resource_usage('main.2.5')
    gen_widths(options,agi) # writes agi.widths_list and agi.widths_dict
    gen_extra_widths(agi) # writes agi.extra_widths_nt and agi.exta_widths_reg
    gen_element_types_base(agi) 
    gen_element_types(agi) # write agi.xtypes dict, agi.xtypes
    gen_pointer_names(options,agi)
    
+   print_resource_usage('main.3')
    
    # this reads the pattern input, builds a graph, emits the decoder
    # graph and the itable, emits the extractor functions, computes the
@@ -6412,9 +6428,14 @@ def main():
    
    # emit functions to identify AVX and AVX512 instruction groups
    classifier.work(agi) 
+   
+   print_resource_usage('main.4')
    gen_ild(agi)
-   gen_cpuid_map(agi)
+   gen_cpuid_map(agi) 
+
+   print_resource_usage('main.5')
    agi.close_output_files()
+   print_resource_usage('main.6')
    agi.dump_generated_files()
 
 ################################################

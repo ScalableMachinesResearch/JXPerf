@@ -18,5 +18,6 @@ clean:
 	make -C preload clean
 	make -C thirdparty/watchpoint-lib clean
 	make -C thirdparty/libpfm-4.10.1 clean
+	cd thirdparty/xed && ./mfile.py clean 
 	mvn -f thirdparty/modified_allocation_callback/pom.xml clean
 	rm -rf build

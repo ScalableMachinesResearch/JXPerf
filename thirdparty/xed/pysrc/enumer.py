@@ -3,7 +3,7 @@
 # Mark Charney <mark.charney@intel.com>
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -21,18 +21,20 @@
 from __future__ import print_function
 import os
 import sys
+import types
 import re
 import codegen
 
 def find_dir(d):
-    directory = os.getcwd()
+    dir = os.getcwd()
     last = ''
-    while directory != last:
-        target_dir = os.path.join(directory,d)
+    while dir != last:
+        target_dir = os.path.join(dir,d)
+        #print "Trying %s" % (target_dir)
         if os.path.exists(target_dir):
             return target_dir
-        last = directory
-        directory = os.path.split(directory)[0]
+        last = dir
+        (dir,tail) = os.path.split(dir)
     return None
 sys.path.append(find_dir('mbuild'))
 try:
@@ -85,6 +87,9 @@ def _make_foo2str():
         ]
     s = "\n".join(l)
     return s
+    pass
+
+                                   
 
         
 class enumer_t(object):
@@ -350,13 +355,13 @@ class enumer_t(object):
         self._emit_comment()
         
     def _emit_typedef(self):
-        xmax = len(self.values) + len(self.duplicates)
+        max = len(self.values) + len(self.duplicates)
         self.hf.emit_eol("typedef enum {")
         for i,v in enumerate(self.values):
             self.hf.emit("  %s%s" % (self.prefix,v.name))
             if v.value != None:
                 self.hf.emit("=%s" % v.value)
-            if i < xmax-1:
+            if i < max-1:
                 self.hf.emit(',')
             if v.doxygen != None:
                 self.hf.emit(" %s" % v.doxygen)
@@ -375,7 +380,7 @@ class enumer_t(object):
                    self.hf.emit("=%s%s" % (self.prefix,v.value))
                 else:
                    self.hf.emit("=%s" % v.value)
-            if i+bias < xmax-1:
+            if i+bias < max-1:
                 self.hf.emit(',')
             if v.doxygen != None:
                 self.hf.emit(" %s" % v.doxygen)
@@ -537,7 +542,7 @@ const char* %(type)s2str(const %(type)s p)
        self.cf.emit_eol(end % (d))
 
     def _emit_enum2str_convert(self):
-       if self.density == 'sparse':
+       if (self.density == 'sparse'):
           self._emit_sparse_enum2str_convert()
        else:
           self._emit_dense_enum2str_convert()

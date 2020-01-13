@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -26,11 +26,19 @@ END_LEGAL */
 #include "xed-reg-class.h"
 
 #include "xed-encoder.h" // a generated file of prototypes
-#include <string.h>  // memset
+
 //FIXME just need one proto from the above file: xed_bool_t
 //xed_encode_nonterminal_ISA_ENCODE(xed_encoder_request_t& xes);
 
 
+const xed_operand_values_t*
+xed_encoder_request_operands_const(const xed_encoder_request_t* p) {
+    return p;
+}
+xed_operand_values_t*
+xed_encoder_request_operands(xed_encoder_request_t* p) {
+    return p;
+}
 
 // Emitting the legacy map bytes.
 // Need to convert from xed_ild_map_enum_t to the actual bytes.
@@ -222,7 +230,7 @@ xed_encoder_request__memop_compatible(const xed_encoder_request_t* p,
     xed_uint16_t request_width_bytes = xed3_operand_get_mem_width(p);
 
     // figure out the width, in bytes, of the specified operand
-    xed_uint_t eosz = xed3_operand_get_eosz(p);
+    xed_uint8_t eosz  = xed3_operand_get_eosz(p);
     xed_assert(operand_width < XED_OPERAND_WIDTH_LAST);
     xed_assert(eosz < 4);
     operand_width_bytes = xed_width_bits[operand_width][eosz]>>3;
@@ -232,19 +240,15 @@ xed_encoder_request__memop_compatible(const xed_encoder_request_t* p,
     return 0;
 }
 
-static XED_INLINE void zero_inst_enc(xed_encoder_request_t* p)
-{
-    memset(p,0,sizeof(xed_encoder_request_t));
-}
 
 void xed_encoder_request_zero_set_mode(xed_encoder_request_t* p,
                                         const xed_state_t* dstate) {
-    zero_inst_enc(p);
+    memset(p, 0, sizeof(xed_encoder_request_t));
     xed_operand_values_set_mode(p,dstate);
 }
 
 void xed_encoder_request_zero(xed_encoder_request_t* p)    {
-    zero_inst_enc(p);
+    memset(p, 0, sizeof(xed_encoder_request_t));
 }
 
 xed_iclass_enum_t
@@ -255,6 +259,15 @@ xed_encoder_request_get_iclass( const xed_encoder_request_t* p)
 void   xed_encoder_request_set_iclass( xed_encoder_request_t* p, 
                                        xed_iclass_enum_t iclass) {
     xed3_operand_set_iclass(p,iclass);
+}
+void xed_encoder_request_set_repne(xed_encoder_request_t* p) {
+    xed3_operand_set_rep(p,2);
+}
+void xed_encoder_request_set_rep(xed_encoder_request_t* p) {
+    xed3_operand_set_rep(p,3);
+}
+void xed_encoder_request_clear_rep(xed_encoder_request_t* p) {
+    xed3_operand_set_rep(p,0);
 }
 
 
@@ -348,7 +361,7 @@ void xed_encoder_request_set_mem1(xed_encoder_request_t* p) {
 }
 void xed_encoder_request_set_memory_operand_length(xed_encoder_request_t* p,
                                                    xed_uint_t nbytes) {
-    xed3_operand_set_mem_width(p,XED_STATIC_CAST(xed_uint16_t,nbytes));
+    xed3_operand_set_mem_width(p,nbytes);
 }
 void xed_encoder_request_set_seg0(xed_encoder_request_t* p,
                                   xed_reg_enum_t seg_reg) {
@@ -383,8 +396,7 @@ void xed_encoder_request_set_operand_order(xed_encoder_request_t* p,
 
     /* track the maximum number of operands */
     if (operand_index+1 > p->_n_operand_order)
-        p->_n_operand_order =
-            XED_STATIC_CAST(xed_uint8_t, operand_index + 1);
+        p->_n_operand_order = operand_index + 1;
 }
 
 xed_operand_enum_t
@@ -413,12 +425,12 @@ xed_encode_request_print(const xed_encoder_request_t* p,
                          xed_uint_t buflen)  {
     char* t;
     xed_uint_t i;
-    xed_int_t blen = XED_STATIC_CAST(xed_int_t,buflen);
+    xed_uint_t blen = buflen;
     if (buflen < 1000) {
         (void)xed_strncpy(buf,
                           "Buffer passed to xed_encode_request_print is "
                           "too short. Try 1000 bytes",
-                          blen);
+                          buflen);
         return;
     }
     blen = xed_strncpy(buf,
@@ -427,7 +439,7 @@ xed_encode_request_print(const xed_encoder_request_t* p,
     blen = xed_strncat(buf, " ",blen);
     t = buf + xed_strlen(buf);
     xed_operand_values_print_short( p, t, blen);
-    blen = XED_STATIC_CAST(xed_int_t,buflen  - xed_strlen(buf));
+    blen = buflen  - xed_strlen(buf);
 
     if (p->_n_operand_order) {
         blen = xed_strncat(buf,"\nOPERAND ORDER: ",blen);
@@ -500,24 +512,6 @@ static void set_vl(xed_reg_enum_t reg, xed_uint_t* vl)
 static void xed_encode_precondition_vl(xed_encoder_request_t* req)
 {
     xed_uint_t vl;
-    if (xed3_operand_get_vlx(req)) {
-        // Both vl and vlx are set by decoder, decoder outputs. And when
-        //     vlx is set it is set to vlx==(vl+1).
-        
-        // VLX is an encoder output, VL is an encoder input.
-        
-        // If VLX > 0, then we decoded something with a VLX setting but VL
-        // is not used as a vector length. It is just more opcode bits.
-        
-        // If VLX=0 and VL=0, then we might still have a user-set VL, but
-        //   we changed the xed grammar for things that do not use VL as a
-        //   real vector length to use VLX in their patterns.
-
-        // So if VLX=0 and VL=0, we can try to guess the VL value below.
-        
-        // Things that get copied for encode-to-decode, both vl and vlx will be set.
-        return;
-    }
     vl = xed3_operand_get_vl(req);
     // If user set nonzero value, respect it.  If user set vl=0, we cannot
     // tell so we try to override.  Note: It would be very wrong to
@@ -541,23 +535,6 @@ static void xed_encode_precondition_vl(xed_encoder_request_t* req)
                 break;
             set_vl(r,&vl);
         }
-#if !defined(XED_SUPPORTS_KNC)
-        // Exclude for KNC which has vex-encoded prefetches of 64 bytes.
-        
-        // FIXME: ONLY SET FOR THINGS WITH SIMD (OR K-MASK FOR FPCLASS, VCMP) REGISTERS
-        
-        if (xed3_operand_get_mem0(req)) {
-            xed_uint_t bytes = xed3_operand_get_mem_width(req);
-            if (bytes == 32) {
-                if (vl < 1)
-                    vl = 1;
-            }
-            else if (bytes == 64) {
-                vl = 2;
-            }
-        }
-#endif       
-        
         xed3_operand_set_vl(req,vl);
     }
 }

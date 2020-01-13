@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -129,7 +129,7 @@ xed_decoded_inst_vector_length_bits(xed_decoded_inst_t const* const p);
 /// @ingroup DEC
 /// Returns the number of legacy prefixes.
 XED_DLL_EXPORT xed_uint_t
-xed_decoded_inst_get_nprefixes(const xed_decoded_inst_t* p);
+xed_decoded_inst_get_nprefixes(xed_decoded_inst_t* p);
 
 //@}
 
@@ -190,7 +190,8 @@ xed_decoded_inst_operand_element_size_bits(const xed_decoded_inst_t* p,
 /// @ingroup DEC
 XED_DLL_EXPORT xed_operand_element_type_enum_t
 xed_decoded_inst_operand_element_type(const xed_decoded_inst_t* p,
-                                      unsigned int operand_index);
+                                      unsigned int operand_index,
+                                      xed_operand_element_xtype_enum_t* xx_type);
 
 /// Interpret the operand action in light of AVX512 masking and
 /// zeroing/merging.  If masking and merging are used together, the dest
@@ -300,7 +301,7 @@ xed_decoded_inst_get_byte(const xed_decoded_inst_t* p, xed_uint_t byte_index)
 /// derived from the input mode information.
 static XED_INLINE xed_uint_t
 xed_decoded_inst_get_machine_mode_bits(const xed_decoded_inst_t* p) {
-    xed_uint_t mode = xed3_operand_get_mode(p);
+    xed_uint8_t mode = xed3_operand_get_mode(p);
     if (mode == 2) return 64;
     if (mode == 1) return 32;
     return 16;
@@ -310,7 +311,7 @@ xed_decoded_inst_get_machine_mode_bits(const xed_decoded_inst_t* p) {
 /// bits. This is derived from the input mode information.
 static XED_INLINE xed_uint_t
 xed_decoded_inst_get_stack_address_mode_bits(const xed_decoded_inst_t* p) {
-    xed_uint_t smode = xed3_operand_get_smode(p);
+    xed_uint8_t smode = xed3_operand_get_smode(p);
     if (smode == 2) return 64;
     if (smode == 1) return 32;
     return 16;

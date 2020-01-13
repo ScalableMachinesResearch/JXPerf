@@ -3,7 +3,7 @@
 ################################################################################
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -19,8 +19,7 @@
 #  
 #END_LEGAL
 
-import os
-import re
+import os, sys, types, re
 import codegen
 import genutil
 import ildutil
@@ -407,9 +406,9 @@ class operands_storage_t(object):
                              accessors='none')
             
             #emit the operand with bit fields
-            for i,xbin in enumerate(self.bins):
-                for op in xbin.operands:
-                    cgen.add_var(op.name.lower(), xbin.storage_ctype, 
+            for i,bin in enumerate(self.bins):
+                for op in bin.operands:
+                    cgen.add_var(op.name.lower(), bin.storage_ctype, 
                                  bit_width=op.bitwidth, accessors='none')
         
         else:
@@ -433,7 +432,8 @@ class operands_storage_t(object):
                 has_last = True
         if has_last:
             return len(values_list)
-        return len(values_list) + 1  
+        else:
+            return len(values_list) + 1  
     
     def _gen_max_bits_per_enum(self,all_enums):
         ''' calculate the number of bits required to capture the each enum.
@@ -468,15 +468,15 @@ class operands_storage_t(object):
     
     def _place_operand_in_bin(self,op,bins):
         ''' find a bin that has place for the operand '''
-        for xbin in bins:
-            if xbin.operand_fits(op):
-                xbin.add_operand(op)
+        for bin in bins:
+            if bin.operand_fits(op):
+                bin.add_operand(op)
                 return
         
         #did not find any matching bin, need to create new one
-        xbin = operands_bin_t()
-        xbin.add_operand(op)
-        bins.append(xbin)
+        bin = operands_bin_t()
+        bin.add_operand(op)
+        bins.append(bin)
         return
             
     def _partition_to_bins(self,ops_sorted):

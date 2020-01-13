@@ -16,49 +16,44 @@
 
 package com.google.monitoring.runtime.instrumentation;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.commons.CodeSizeEvaluator;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 /**
- * This is a class writer that gets used in place of the existing 
- * {@link org.objectweb.asm.ClassWriter},
- * and verifies properties of the class getting written.
- * 
- * Currently, it only checks to see if the methods are of the correct length
- * for Java methods (&lt;64K).
- * 
+ * This is a class writer that gets used in place of the existing {@link
+ * org.objectweb.asm.ClassWriter}, and verifies properties of the class getting written.
+ *
+ * <p>Currently, it only checks to see if the methods are of the correct length for Java methods
+ * (&lt;64K).
  */
 public class VerifyingClassAdapter extends ClassVisitor {
-  private static final Logger logger =
-    Logger.getLogger(VerifyingClassAdapter.class.getName());
+  private static final Logger logger = Logger.getLogger(VerifyingClassAdapter.class.getName());
 
-  /**
-   * An enum which indicates whether the class in question is verified.
-   */
+  /** An enum which indicates whether the class in question is verified. */
   public enum State {
-    PASS, UNKNOWN, FAIL_TOO_LONG;
+    PASS,
+    UNKNOWN,
+    FAIL_TOO_LONG;
   }
-  
+
   final ClassWriter cw;
-  final byte [] original;
+  final byte[] original;
   final String className;
   String message;
   State state;
-  
+
   /**
    * @param cw A class writer that is wrapped by this class adapter
    * @param original the original bytecode
    * @param className the name of the class being examined.
    */
-  public VerifyingClassAdapter(ClassWriter cw, byte [] original,
-      String className) {
-    super(Opcodes.ASM6, cw);
+  public VerifyingClassAdapter(ClassWriter cw, byte[] original, String className) {
+    super(Opcodes.ASM7_EXPERIMENTAL, cw);
     state = State.UNKNOWN;
     message = "The class has not finished being examined";
     this.cw = cw;
@@ -68,9 +63,9 @@ public class VerifyingClassAdapter extends ClassVisitor {
 
   /**
    * {@inheritDoc}
-   * 
-   * In addition, the returned {@link org.objectweb.asm.MethodVisitor}
-   * will throw an exception if the method is greater than 64K in length.
+   *
+   * <p>In addition, the returned {@link org.objectweb.asm.MethodVisitor} will throw an exception if
+   * the method is greater than 64K in length.
    */
   @Override
   public MethodVisitor visitMethod(
@@ -79,8 +74,7 @@ public class VerifyingClassAdapter extends ClassVisitor {
       final String desc,
       final String signature,
       final String[] exceptions) {
-    MethodVisitor mv =
-      super.visitMethod(access, name, desc, signature, exceptions);
+    MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
     return new CodeSizeEvaluator(mv) {
       @Override
       public void visitEnd() {
@@ -92,10 +86,8 @@ public class VerifyingClassAdapter extends ClassVisitor {
       }
     };
   }
-  
-  /**
-   * {@inheritDoc}
-   */
+
+  /** {@inheritDoc} */
   @Override
   public void visitEnd() {
     super.visitEnd();
@@ -106,22 +98,21 @@ public class VerifyingClassAdapter extends ClassVisitor {
 
   /**
    * Gets the verification state of this class.
-   * 
+   *
    * @return true iff the class passed inspection.
    */
   public boolean isVerified() {
     return state == State.PASS;
   }
-  
+
   /**
    * Returns the byte array that contains the byte code for this class.
-   * 
+   *
    * @return a byte array.
    */
   public byte[] toByteArray() {
     if (state != State.PASS) {
-      logger.log(Level.WARNING,
-          "Failed to instrument class " + className + " because " + message);
+      logger.log(Level.WARNING, "Failed to instrument class " + className + " because " + message);
       return original;
     }
     return cw.toByteArray();

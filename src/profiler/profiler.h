@@ -14,6 +14,19 @@
 #include "splay.h"
 #include "lock.h"
 
+typedef struct {
+    uint64_t offset;
+    void* value;
+    int type;
+} wp_info_t;
+
+typedef struct {
+    bool first_process;
+    int64_t sample_count;
+    int64_t avail_wp;
+    std::vector<wp_info_t> watchpoint_info;
+} per_context_info_t;
+
 class Profiler {
 public:
 
@@ -37,12 +50,14 @@ public:
   static ASGCT_FN _asgct;
 
 private:
-  static void OnSample(int event_idx, perf_sample_data_t *sample_data, void *context, int metric_id1, int metric_id2);
+  static void OnSample(int event_idx, perf_sample_data_t *sample_data, void *context, int metric_id1, int metric_id2, int metric_id3);
+  static WP_TriggerAction_t OnObjectLevelWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnRedStoreWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnRedLoadWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t DetectRedundancy(WP_TriggerInfo_t *wpi, jmethodID method_id, uint32_t method_version, std::string client_name);
   static void DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2);
+  static void ObjectLevelRedundancy(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, int metric_id2, int metric_id3);
   
   inline void output_statistics(); 
 

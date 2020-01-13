@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -79,8 +79,7 @@ static void add_read_operands(xed_dot_graph_supp_t* gg,
     noperands = xed_inst_noperands(xi);
     
     for( i=0; i < noperands ; i++) {
-        const unsigned int no_memop = 99;
-        unsigned int memop = no_memop;
+        int memop = -1;
         const xed_operand_t* op = xed_inst_operand(xi,i);
         xed_operand_enum_t opname = xed_operand_name(op);
         if (xed_operand_is_register(opname) ||
@@ -98,7 +97,7 @@ static void add_read_operands(xed_dot_graph_supp_t* gg,
         else if (opname == XED_OPERAND_MEM1 ) 
             memop = 1;
 
-        if (memop != no_memop) {
+        if (memop != -1) {
             /* get reads of base/index regs,  if any */
             xed_reg_enum_t base, indx;
             
@@ -176,7 +175,6 @@ void xed_dot_graph_add_instruction(
     char* p = 0;
     size_t alen = 0;
     int ok;
-    xed_bool_t ok2;
     xed_dot_node_t* n = 0;
     xed_uint32_t remaining_buffer_bytes = XED_DOT_TMP_BUF_LEN;
     
@@ -197,14 +195,14 @@ void xed_dot_graph_add_instruction(
     p = disasm_str + alen;
     remaining_buffer_bytes -= XED_CAST(xed_uint32_t, alen);
 
-    ok2 = xed_format_context(gg->syntax,
+    ok = xed_format_context(gg->syntax,
                             xedd, 
                             p,
-                             (int)remaining_buffer_bytes,
+                            remaining_buffer_bytes,
                             runtime_instr_addr,
                             caller_data,
                             disas_symbol_cb);
-    if (!ok2) {
+    if (!ok) {
         (void)xed_strncpy(disasm_str,"???", XED_DOT_TMP_BUF_LEN);
     }
     

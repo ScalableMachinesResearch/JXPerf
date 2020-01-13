@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- python -*-
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -84,25 +84,20 @@ def find_mbuild_import():
     sys.path.insert(0,mbuild_install_path)
     
 def work():
-    if sys.version_info[0] == 3:
-        if sys.version_info[1] < 4:        
-            fatal("Need python version 3.4 or later.")
-    else:
+    if sys.version_info[0] == 3 and sys.version_info[1] < 4:        
         fatal("Need python version 3.4 or later.")
-        
+    if sys.version_info[0] == 2 and sys.version_info[1] < 7:        
+        fatal("Need python version 2.7 or later.")
     try:
         find_mbuild_import()
     except:
         fatal("mbuild import failed")
     import xed_mbuild
     import xed_build_common
-    if 0:
+    try:
         retval = xed_mbuild.execute()
-    else:
-        try:
-            retval = xed_mbuild.execute()
-        except Exception as e:
-            xed_build_common.handle_exception_and_die(e)
+    except Exception as e:
+        xed_build_common.handle_exception_and_die(e)
     return retval
     
 if __name__ == "__main__":

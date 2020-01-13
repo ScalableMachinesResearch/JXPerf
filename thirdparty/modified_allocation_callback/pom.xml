@@ -66,17 +66,23 @@
   </scm>
 
   <issueManagement>
-    <system>Google Code Issue Tracking</system>
-    <url>http://code.google.com/p/java-allocation-instrumenter/issues/list</url>
+    <system>GitHub</system>
+    <url>https://github.com/google/allocation-instrumenter/issues</url>
   </issueManagement>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <projectAsmVersion>6.0</projectAsmVersion>
+    <projectAsmVersion>6.2.1</projectAsmVersion>
     <gpg.skip>true</gpg.skip>
+    <maven.test.skip>true</maven.test.skip>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <version>1.2</version>
+    </dependency>
     <dependency>
       <groupId>org.ow2.asm</groupId>
       <artifactId>asm</artifactId>
@@ -110,7 +116,7 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>23.5-android</version>
+      <version>26.0-android</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -185,6 +191,8 @@
             <link>http://docs.oracle.com/javase/8/docs/api/</link>
           </links>
           <version>true</version>
+          <source>8</source>
+          <target>8</target>
           <show>public</show>
         </configuration>
       </plugin>
@@ -251,7 +259,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.1.0</version>
+        <version>3.2.0</version>
         <executions>
           <execution>
             <phase>package</phase>
