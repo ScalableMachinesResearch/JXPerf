@@ -35,3 +35,8 @@
         (1) Identify the objects suffering from high L1 cache misses by looking into the metric "L1 Cache Misses" 
         (2) Check whether these objects have high allocation times by looking into the metric "Allocation Times" 
         (3) The objects having both high L1 cache misses and allocation times are primary optimization candidates
+
+8. To run object-level redundancy detection
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=OBJLEVEL::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java program>
+  b. python $JXPerf_HOME/process_raw_data.py
+    1) A dump file named "agent-data" would be generated
