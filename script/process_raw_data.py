@@ -5,7 +5,6 @@ from pylib import *
 from multiprocessing.dummy import Pool as ThreadPool
 from functools import partial
 
-
 ##global variables
 isDataCentric = False
 isObjLevel = False
@@ -188,7 +187,6 @@ def output_to_file(method_manager, context_manager, dump_data, dump_data2):
 					else:
 						dump_data2[key] = (ctxt_list[-1].metrics_dict["inequality"])
 
-
 	else:
 		for ctxt_list in context_manager.getAllPaths("0", "root-leaf"):#"root-subnode"):
 			if ctxt_list[-1].metrics_dict:
@@ -315,7 +313,7 @@ def main():
 			inequalityTimes = 0
 			if dump_data2.has_key(row[0]):
 				inequalityTimes = dump_data2[row[0]]	
-			file.write(row[0] + "\n\nOccurrence Fraction: " + str(round(float(equalityTimes) * 100 / totalEqualityTimes, 2)) + "%;" + " Equality Fraction: " + str(round(float(equalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%;" + " Inequality Fraction: " + str(round(float(inequalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%\n")
+			file.write(row[0] + "\n\nFraction of Occurrence: " + str(round(float(equalityTimes) * 100 / totalEqualityTimes, 2)) + "%;" + " Fraction of Equality: " + str(round(float(equalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%;" + " Fraction of Inequality: " + str(round(float(inequalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%\n")
 		file.write("\nTotal Equality Times: " + result[0])
 		file.write("\nTotal Inequality Times: " + result[1])
 
