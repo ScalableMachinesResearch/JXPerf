@@ -1,7 +1,7 @@
 1. Installation Prerequisites
-  a. Install Oracle/OpenJDK.
+  a. Install Oracle/OpenJDK and Apache Maven.
   b. cp set_env.template set_env
-  c. Modify set_env to make JXPerf_HOME and JAVA_HOME point to your JXPerf home and Java home.
+  c. Modify set_env to make JXPerf_HOME, JAVA_HOME and MAVEN_HOME point to your JXPerf, Java and Maven home.
   d. source set_env
 
 2. Installation
