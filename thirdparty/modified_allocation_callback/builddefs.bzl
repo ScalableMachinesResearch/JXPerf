@@ -20,7 +20,7 @@ def expand_template_impl(ctx):
 expand_template = rule(
     implementation = expand_template_impl,
     attrs = {
-        "template": attr.label(mandatory = True, allow_files = True, single_file = True),
+        "template": attr.label(mandatory = True, allow_single_file = True),
         "substitutions": attr.string_dict(mandatory = True),
         "out": attr.output(mandatory = True),
         "is_executable": attr.bool(default = False, mandatory = False),
@@ -35,6 +35,7 @@ def java_agent_binary(
         deps,
         visibility = ["//visibility:private"],
         compatible_with = None,
+        resources = None,
         **kwds):
     """Builddef to create a Java instrumentation agent cleanly.
 
@@ -110,6 +111,7 @@ def java_agent_binary(
         runtime_deps = [":" + library_name],
         visibility = ["//visibility:private"],
         compatible_with = compatible_with,
+        resources = resources,
         **kwds
     )
 

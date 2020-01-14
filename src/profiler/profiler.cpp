@@ -292,10 +292,7 @@ WP_TriggerAction_t Profiler::OnObjectLevelWatchPoint(WP_TriggerInfo_t *wpi) {
     FloatType floatType;
     xed_operand_element_xtype_enum_t xx_type;
     void* addr = (void*)-1;
-    if(get_mem_access_length_and_type_address(wpi->pc, (uint32_t*)(&accessLen), &accessType, &floatType, wpi->uCtxt, &addr, &xx_type) == false) {
-        profiler_safe_exit();
-        return WP_DISABLE;
-    }
+    get_mem_access_length_and_type_address(wpi->va, (uint32_t*)(&accessLen), &accessType, &floatType, wpi->uCtxt, &addr, &xx_type);
 
     if(xx_type == XED_OPERAND_XTYPE_F32 && wpi->type_vechead == XED_OPERAND_XTYPE_F32) {
         float new_value = *(float*)(wpi->data);
@@ -382,7 +379,7 @@ WP_TriggerAction_t Profiler::OnObjectLevelWatchPoint(WP_TriggerInfo_t *wpi) {
 			assert(metrics->increment(wpi->metric_id3, metric_val));
         }
 	}
-
+    
     profiler_safe_exit();
     return WP_DISABLE;
 }
