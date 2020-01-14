@@ -769,8 +769,8 @@ Profiler::Profiler() {
     assert(_asgct);
 }
 
-
 void Profiler::init() {
+
 #ifndef COUNT_OVERHEAD
     _method_file.open("agent-trace-method.run");
     _method_file << XML_FILE_HEADER << std::endl;
@@ -853,7 +853,6 @@ void Profiler::threadStart() {
 
 void Profiler::threadEnd() {
     PerfManager::closeEvents();
-    //if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0 && clientName.compare(OBJECT_LEVEL_CLIENT_NAME) != 0) {
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
         WP_ThreadTerminate();
     }
@@ -897,7 +896,7 @@ void Profiler::threadEnd() {
 #endif
     
     //clean up the context state
-    //delete ctxt_tree;
+    delete ctxt_tree;
     TD_GET(context_state) = nullptr;
 
 #ifdef PRINT_PMU_INS
