@@ -379,7 +379,7 @@ WP_TriggerAction_t Profiler::OnObjectLevelWatchPoint(WP_TriggerInfo_t *wpi) {
 			assert(metrics->increment(wpi->metric_id3, metric_val));
         }
 	}
-    
+	
     profiler_safe_exit();
     return WP_DISABLE;
 }
