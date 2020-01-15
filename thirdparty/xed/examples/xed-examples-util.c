@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ END_LEGAL */
 #include "xed/xed-get-time.h"
 #include "xed-examples-util.h"
 #include <string.h> //strlen, memcmp, memset
-#include <stddef.h> //ptrdiff_t
 #if defined(XED_MAC) || defined(XED_LINUX) || defined(XED_BSD)
 # include <unistd.h>
 # include <sys/mman.h>
@@ -38,12 +37,6 @@ END_LEGAL */
 #if defined(PTI_XED_TEST)
 #include "pti-xed-test.h"
 #endif
-
-#define DCAST(x) XED_STATIC_CAST(double,(x))
-#define XCAST(x) XED_STATIC_CAST(xed_int64_t,(x))
-#define U64CAST(x) XED_STATIC_CAST(xed_uint64_t,(x))
-#define ICAST(x) XED_STATIC_CAST(xed_int_t,(x))
-#define UCAST(x) XED_STATIC_CAST(xed_uint_t,(x))
 
 
 #define XED_TMP_BUF_LEN (1024*4)
@@ -77,7 +70,7 @@ update_histogram(xed_stats_t* p,
 {
     xed_uint32_t bin;
     if (delta  < XED_HISTO_MAX_CYCLES)
-        bin = XED_STATIC_CAST(xed_uint32_t, delta / XED_HISTO_CYCLES_PER_BIN);
+        bin = delta / XED_HISTO_CYCLES_PER_BIN;
     else
         bin = XED_HISTO_BINS-1;
     p->histo[bin]++;
@@ -157,11 +150,8 @@ int client_verbose=0;
 ////////////////////////////////////////////////////////////////////////////
 
 static char xed_toupper(char c) {
-    if (c >= 'a' && c <= 'z') {
-        int t = c - 'a';
-        char u = (char)(t+'A');
-        return u;
-    }
+    if (c >= 'a' && c <= 'z')
+        return c-'a'+'A';
     return c;
 }
 
@@ -169,23 +159,19 @@ char* xed_upcase_buf(char* s) {
     xed_uint_t len = XED_STATIC_CAST(xed_uint_t,strlen(s));
     xed_uint_t i;
     for(i=0 ; i < len ; i++ ) 
-        s[i] = xed_toupper(s[i]);
+        s[i] = XED_STATIC_CAST(char,xed_toupper(s[i]));
     return s;
 }
 
-static xed_uint8_t letter_cvt(char a, char base) {
-    return (xed_uint8_t)(a-base);
-}
-
-static xed_uint8_t convert_nibble(char x) {
+static xed_uint8_t convert_nibble(xed_uint8_t x) {
     // convert ascii nibble to hex
     xed_uint8_t rv = 0;
     if (x >= '0' && x <= '9') 
-        rv = letter_cvt(x, '0');
+        rv = x - '0';
     else if (x >= 'A' && x <= 'F') 
-        rv = (xed_uint8_t)(letter_cvt(x,'A') + 10U);
+        rv = x - 'A' + 10;
     else if (x >= 'a' && x <= 'f') 
-        rv = (xed_uint8_t)(letter_cvt(x,'a') + 10U);
+        rv = x - 'a' + 10;
     else    {
         printf("Error converting hex digit. Nibble value 0x%x\n", x);
         exit(1);
@@ -225,7 +211,7 @@ xed_int64_t xed_atoi_general(char* buf, int mul) {
     }
 
     b = xed_strtoll(buf,0);
-    if (*p)
+    if (p)
     {
         while(*p && (*p == '-' || *p == '+'))
         {
@@ -255,20 +241,19 @@ xed_int64_t xed_atoi_general(char* buf, int mul) {
     return b;
 }
 
-
 static char nibble_to_ascii_hex(xed_uint8_t i) {
-    if (i<10) return (char)(i+'0');
-    if (i<16) return (char)(i-10+'A');
+    if (i<10) return i+'0';
+    if (i<16) return i-10+'A';
     return '?';
 }
 
 void xed_print_hex_line(char* buf,
                         const xed_uint8_t* array,
-                        const unsigned int length, 
-                        const unsigned int buflen)
+                        const int length, 
+                        const int buflen)
 {
-  unsigned int n = length;
-  unsigned int i = 0;
+  int n = length;
+  int i=0;
   if (length == 0)
       n = XED_MAX_INSTRUCTION_BYTES;
   assert(buflen >= (2*n+1)); /* including null */
@@ -328,8 +313,6 @@ decode_internal(xed_decoded_inst_t* xedd,
 void init_xedd(xed_decoded_inst_t* xedd,
                xed_disas_info_t* di)
 {
-
-
 #if defined(XED_DECODER)
     xed_decoded_inst_zero_set_mode(xedd, &(di->dstate));
 #endif
@@ -345,6 +328,16 @@ void init_xedd(xed_decoded_inst_t* xedd,
 }
 
 ////////////////////////////////////////////////////////////////////////////
+
+#if defined(_MSC_VER) 
+#  if  _MSC_VER==1200
+#    define XCAST(x) XED_STATIC_CAST(xed_int64_t,x)
+#  else 
+#    define XCAST(x) (x)
+#  endif
+#else
+# define XCAST(x) (x)
+#endif
 
 static void
 dump_histo(xed_uint64_t* histo,
@@ -362,7 +355,7 @@ dump_histo(xed_uint64_t* histo,
     
     for(i=0;i<bins;i++)
     {
-        double pct = 100.0*DCAST(histo[i])/DCAST(total);
+        double pct = 100.0*histo[i]/total;
         cdf += pct;
         printf("[ %4u ... %4u ]  " XED_FMT_LU12 "  %7.2lf%%  %7.2lf%%\n",
                i*cycles_per_bin,
@@ -392,11 +385,11 @@ print_decode_stats_internal( xed_disas_info_t*di,
     printf("#Total tail instructions %s: " XED_FMT_LU "\n", dec_enc,
            p->total_insts_tail);
 
-    cpi  =  1.0 * DCAST(p->total_time) / DCAST(p->total_insts);
+    cpi  =  1.0 * XCAST(p->total_time) / XCAST(p->total_insts);
     printf("#Total cycles/instruction %s: %.2f\n" , dec_enc, cpi);
 
-    cpi_tail = 1.0 * DCAST(p->total_time_tail) /
-               DCAST(p->total_insts_tail);
+    cpi_tail = 1.0 * XCAST(p->total_time_tail) /
+               XCAST(p->total_insts_tail);
     printf("#Total tail cycles/instruction %s: %.2f\n" , dec_enc, cpi_tail);
 
     if (p->bad_times)
@@ -449,7 +442,6 @@ xed_map_region(const char* path,
     ilen = ftell(f);
     fprintf(stderr,"#Trying to read " XED_FMT_SIZET "\n", ilen);
     p = (xed_uint8_t*)malloc(ilen);
-    assert(p!=0);
     t=0;
     err = fseek(f,0, SEEK_SET);
     if (err != 0) {
@@ -477,8 +469,7 @@ xed_map_region(const char* path,
     *length = (unsigned int)ilen;
     
 #else 
-    off_t ilen;
-    int fd;
+    int ilen,fd;
     fd = open(path, O_RDONLY);
     if (fd == -1)   {
         printf("Could not open file: %s\n" , path);
@@ -525,7 +516,7 @@ void disassemble(xed_disas_info_t* di,
                  xed_uint64_t runtime_instruction_address,
                  void* caller_data) 
 {
-    xed_bool_t ok;
+    int ok;
     xed_print_info_t pi;
     xed_init_print_info(&pi);
     pi.p = xedd;
@@ -586,23 +577,6 @@ print_hex_line(const xed_uint8_t* p,
         printf("%s\n", buf);
 }
 
-static void 
-print_attributes(xed_decoded_inst_t* xedd) {
-    /* Walk the attributes. Generally, you'll know the one you want to
-     * query and just access that one directly. */
-
-    const xed_inst_t* xi = xed_decoded_inst_inst(xedd);
-
-    unsigned int i, nattributes  =  xed_attribute_max();
-
-    printf("ATTRIBUTES: ");
-    for(i=0;i<nattributes;i++) {
-        xed_attribute_enum_t attr = xed_attribute(i);
-        if (xed_inst_get_attribute(xi,attr))
-            printf("%s ", xed_attribute_enum_t2str(attr));
-    }
-    printf("\n");
-}
 
 
 xed_uint_t
@@ -647,20 +621,16 @@ disas_decode_binary(xed_disas_info_t* di,
             char buf[XED_TMP_BUF_LEN];
             if (xed_decoded_inst_valid(xedd)) 
             {
-                printf( "ICLASS:     %s\n"
-                        "CATEGORY:   %s\n"
-                        "EXTENSION:  %s\n"
-                        "IFORM:      %s\n"
-                        "ISA_SET:    %s\n", 
-                        xed_iclass_enum_t2str(xed_decoded_inst_get_iclass(xedd)),
-                        xed_category_enum_t2str(xed_decoded_inst_get_category(xedd)),
-                        xed_extension_enum_t2str(xed_decoded_inst_get_extension(xedd)),
-                        xed_iform_enum_t2str(xed_decoded_inst_get_iform_enum(xedd)),
-                        xed_isa_set_enum_t2str(xed_decoded_inst_get_isa_set(xedd)));
-                print_attributes(xedd);
+                printf( "ICLASS: %s   CATEGORY: %s   EXTENSION: %s  IFORM: %s"
+                        "   ISA_SET: %s\n", 
+                xed_iclass_enum_t2str(xed_decoded_inst_get_iclass(xedd)),
+                xed_category_enum_t2str(xed_decoded_inst_get_category(xedd)),
+                xed_extension_enum_t2str(xed_decoded_inst_get_extension(xedd)),
+                xed_iform_enum_t2str(xed_decoded_inst_get_iform_enum(xedd)),
+                xed_isa_set_enum_t2str(xed_decoded_inst_get_isa_set(xedd)));
             }
             disassemble(di, buf,XED_TMP_BUF_LEN, xedd, runtime_address,0);
-            printf("SHORT:      %s\n", buf);
+            printf("SHORT: %s\n", buf);
         }
         return 1;
     }
@@ -972,7 +942,7 @@ emit_dec_sep_msg(unsigned int i) {
 static void
 emit_addr_hex(xed_uint64_t runtime_instruction_address,
               unsigned char* z,
-              xed_uint_t ilim)
+              int ilim)
 {
     char tbuf[XED_HEX_BUFLEN];
     printf("Runtime Address " XED_FMT_LX ,
@@ -1134,7 +1104,7 @@ die_zero_len(
 {
     printf("Zero length on decoded instruction!\n");
     xed_decode_error( runtime_instruction_address, 
-                      U64CAST(z-di->a), z, xed_error, 15);
+                      z-di->a, z, xed_error, 15);
     xedex_derror("Dying");
 }
 
@@ -1145,7 +1115,7 @@ void xed_disas_test(xed_disas_info_t* di)
     static int first = 1;
     xed_uint64_t errors = 0;
     unsigned int m;
-    unsigned char* z;  // our sliding pointer for decoding
+    unsigned char* z;
     unsigned char* zlimit;
     unsigned int length;
     int skipping;
@@ -1169,7 +1139,7 @@ void xed_disas_test(xed_disas_info_t* di)
     }
 
     m = di->ninst; // number of things to decode
-    z = di->a;   // set to start of region
+    z = di->a;
   
     if (di->runtime_vaddr_disas_start) 
         if (di->runtime_vaddr_disas_start > di->runtime_vaddr)
@@ -1193,7 +1163,7 @@ void xed_disas_test(xed_disas_info_t* di)
     last_all_zeros = 0;
     for( i=0; i<m;i++) 
     {
-        xed_uint_t ilim;
+        int ilim,elim;
         if (zlimit && z >= zlimit) {
             if (di->xml_format == 0)
                 printf("# end of range.\n");
@@ -1207,11 +1177,9 @@ void xed_disas_test(xed_disas_info_t* di)
 
         /* if we get near the end of the section, clip the itext length */
         ilim = 15;
-        // we know z < di->q due to above if() statement. 
-        if (z + ilim > di->q) { 
-            // pointer diff is signed, but in this case guaranteed positive and <= ilim.
-            ilim = UCAST(di->q - z);
-        }
+        elim = di->q - z;
+        if (elim < ilim) 
+           ilim = elim;
 
         if (CLIENT_VERBOSE3) 
             emit_dec_sep_msg(i);
@@ -1238,7 +1206,7 @@ void xed_disas_test(xed_disas_info_t* di)
             last_all_zeros = 0;
         }
 
-        runtime_instruction_address =  U64CAST(z-di->a) + 
+        runtime_instruction_address =  ((xed_uint64_t)(z-di->a)) + 
                                        di->runtime_vaddr;
          
         if (CLIENT_VERBOSE3) 
@@ -1247,7 +1215,7 @@ void xed_disas_test(xed_disas_info_t* di)
         okay = 0;
         length = 0;
 
-        init_xedd(&xedd, di); 
+        init_xedd(&xedd, di); // &(di->dstate), di->chip, di->mpx_mode);
         
         if ( di->decode_only )
         {
@@ -1309,7 +1277,7 @@ void xed_disas_test(xed_disas_info_t* di)
                     length = 1;
 
                 xed_decode_error( runtime_instruction_address,
-                                  U64CAST(z-di->a),
+                                  z-di->a,
                                   z, 
                                   xed_error,
                                   length);
@@ -1329,8 +1297,8 @@ void xed_disas_test(xed_disas_info_t* di)
             okay = (olen != 0);
             if (!okay)  {
                 errors++;
-                printf("-- Could not decode/encode at offset: " XED_FMT_LU "\n" ,
-                       U64CAST(z-di->a));
+                printf("-- Could not decode/encode at offset: %d\n" ,
+                       (int)(z-di->a));
                 // just give a length of 1B to see if we can restart decode...
                 length = 1;
             }        
@@ -1349,7 +1317,7 @@ void xed_disas_test(xed_disas_info_t* di)
         
         
         z = z + length;
-    } //for i
+    }
    
     if (di->xml_format == 0) {
         printf( "# Errors: " XED_FMT_LU "\n", errors);
@@ -1366,18 +1334,17 @@ finish:
 }
 #endif
 
-
 xed_uint8_t
 convert_ascii_nibble(char c)
 {
   if (c >= '0' && c <= '9') {
-      return letter_cvt(c,'0');
+    return c-'0';
   }
   else if (c >= 'a' && c <= 'f') {
-      return (xed_uint8_t)(letter_cvt(c,'a') + 10U);
+    return c-'a' + 10;
   }
   else if (c >= 'A' && c <= 'F') {
-      return (xed_uint8_t)(letter_cvt(c,'A') + 10U);
+    return c-'A' + 10;
   }
   else {
       char buffer[XED_HEX_BUFLEN];
@@ -1405,7 +1372,7 @@ xed_uint64_t convert_ascii_hex_to_int(const char* s) {
 
 
 xed_uint8_t convert_ascii_nibbles(char c1, char c2) {
-    xed_uint8_t a = (xed_uint8_t)(convert_ascii_nibble(c1) * 16 + convert_ascii_nibble(c2));
+    xed_uint8_t a = convert_ascii_nibble(c1) * 16 + convert_ascii_nibble(c2);
     return a;
 }
 
@@ -1453,7 +1420,7 @@ convert_base10(const char* buf)
         }
         else if (c >= '0' && c <= '9')
         {
-            unsigned int digit = letter_cvt(c,'0');
+            unsigned int digit = c - '0';
             v = v*10 + digit;
         }
         else if (c == '_') /* skip underscores */
@@ -1482,17 +1449,17 @@ convert_base16(const char* buf)
         char c = buf[i];
         if (c >= '0' && c <= '9')
         {
-            unsigned int digit = letter_cvt(c, '0');
+            unsigned int digit = c - '0';
             v = v*16 + digit;
         }
         else if (c >= 'A' && c <= 'F')
         {
-            unsigned int digit = letter_cvt(c,'A') + 10U;
+            unsigned int digit = c - 'A' + 10;
             v = v*16 + digit;
         }
         else if (c >= 'a' && c <= 'f')
         {
-            unsigned int digit = letter_cvt(c,'a') + 10U;
+            unsigned int digit = c - 'a' + 10;
             v = v*16 + digit;
         }
         else if (c == '_') /* skip underscores */
@@ -1541,7 +1508,7 @@ char* xed_strdup(char const* const src) {
     char* dst = (char*)malloc(n*sizeof(char));
     assert(dst != 0);
     dst[0]=0; /* start w/ a null */
-    xed_strncat(dst, src, ICAST(n));
+    xed_strncat(dst, src, n);
     return dst;
 }
 
@@ -1563,7 +1530,6 @@ char const* xedex_append_string(char const* p, // p is free()'d
     char const* t = 0; //temp ptr for copying
     size_t tl = (p?strlen(p):0) + strlen(x) + 1;
     m = n = (char*) malloc(tl);
-    assert(m!=0);
     if (p) {
         t = p;
         while(*t)
@@ -1581,9 +1547,7 @@ char const* xedex_append_string(char const* p, // p is free()'d
 
 ////
 static xed_str_list_t* alloc_str_node(void) {
-    xed_str_list_t* p = (xed_str_list_t*)malloc(sizeof(xed_str_list_t));
-    assert(p!=0);
-    return p;
+    return (xed_str_list_t*) malloc(sizeof(xed_str_list_t));
 }
 
 // MS does not have strsep()

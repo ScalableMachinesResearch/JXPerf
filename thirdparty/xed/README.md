@@ -15,14 +15,12 @@ http://mjc.intel.com
 https://github.com/intelxed/xed/issues/new
        
 
-## Abbreviated *GITHUB* building instructions:
+## Abbreviated building instructions:
 
-```shell
-git clone https://github.com/intelxed/xed.git xed
-git clone https://github.com/intelxed/mbuild.git mbuild
-cd xed
-./mfile.py
-```
+    git clone https://github.com/intelxed/xed.git xed
+    git clone https://github.com/intelxed/mbuild.git mbuild
+    cd xed
+    ./mfile.py
 
 then get your libxed.a from the obj directory.
 Add " --shared" if you want a shared object build.
@@ -35,21 +33,17 @@ There are two options:
 
 1) When building libxed you can also build the examples, from the main directory (above examples):
 
-```shell
-./mfile.py examples
-```
+    ./mfile.py examples
 
 and the compiled examples will be in obj/examples.
     
 2) Build a compiled "kit" and the build the examples from within the kit:
 
-```shell
-./mfile.py install
-cd kits
-cd <whatever the kit is called>
-cd examples
-./mfile.py
-```
+    ./mfile.py install
+    cd kits
+    cd <whatever the kit is called>
+    cd examples
+    ./mfile.py
     
 
 See source build documentation for more information.

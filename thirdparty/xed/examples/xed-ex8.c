@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -61,8 +61,7 @@ main(int argc, char** argv) {
     unsigned int first_argv;
     unsigned int bytes = 0;
     unsigned char itext[XED_MAX_INSTRUCTION_BYTES];
-    unsigned int i;
-    unsigned int argcu = (unsigned int) argc;
+    int i;
     unsigned int u;
     xed_decoded_inst_t xedd;
     xed_machine_mode_enum_t mmode;
@@ -71,9 +70,9 @@ main(int argc, char** argv) {
     xed_tables_init();
     xed_set_verbosity( 99 );
 
-    if (argcu > 2 && strcmp(argv[1], "-64") == 0) 
+    if (argc > 2 && strcmp(argv[1], "-64") == 0) 
         long_mode = 1;
-    else if (argcu > 2 && strcmp(argv[1], "-16") == 0) 
+    else if (argc > 2 && strcmp(argv[1], "-16") == 0) 
         prot16 = 1;
 
     if (long_mode) {
@@ -95,17 +94,13 @@ main(int argc, char** argv) {
     xed_decoded_inst_zero(&xedd);
     xed_decoded_inst_set_mode(&xedd, mmode, stack_addr_width);
 
-    for( i=first_argv ;i < argcu; i++)    {
-        if (strlen(argv[i]) != 2) {
-            fprintf(stderr, "not two hex characters: \"%s\"\n", argv[i]);
-            exit(1);
-        }
+    for( i=first_argv ;i < argc; i++)    {
         xed_uint8_t x = (xed_uint8_t)(xed_atoi_hex(argv[i]));
         assert(bytes < XED_MAX_INSTRUCTION_BYTES);
         itext[bytes++] = x;
     }
     if (bytes == 0)    {
-        fprintf(stderr, "Must supply some hex bytes, e.g., 48 89 C0\n");
+        fprintf(stderr, "Must supply some hex bytes\n");
         exit(1);
     }
 

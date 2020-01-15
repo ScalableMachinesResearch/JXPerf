@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -38,6 +38,17 @@ xed_bool_t xed_convert_to_encoder_request(xed_encoder_request_t* out,
         xed_encoder_request_set_effective_operand_width(out, in->effective_operand_width);
     if (in->effective_address_width)
         xed_encoder_request_set_effective_address_size(out, in->effective_address_width);
+
+    if (in->prefixes.s.rep) 
+        xed_encoder_request_set_rep(out);
+    if (in->prefixes.s.repne) 
+        xed_encoder_request_set_repne(out);
+#if 0  // FIXME
+    if (in->prefixes.s.br_hint_taken) 
+        xed_encoder_request_set_hint_taken(out);
+    if (in->prefixes.s.br_hint_not_taken) 
+        xed_encoder_request_set_hint_not_taken(out);
+#endif
 
 
     for(; i< in->noperands ; i++ ) {
@@ -104,10 +115,11 @@ xed_bool_t xed_convert_to_encoder_request(xed_encoder_request_t* out,
             break;
 
           case XED_ENCODER_OPERAND_TYPE_OTHER:
-            // this is used to set encode parameters for AVX512, like
-            // zeroing, rounding or sae. It could be abused to set other
-            // nonsensical things.
             xed3_set_generic_operand(out, op->u.s.operand_name,  op->u.s.value);
+            //xed_encoder_request_set_operand_order(out, real_operands, op->u.s.operand_name);
+            //real_operands++;
+            //FIXME: What is this ??? 
+            xed_assert(0);
             break;
 
           case XED_ENCODER_OPERAND_TYPE_MEM: 

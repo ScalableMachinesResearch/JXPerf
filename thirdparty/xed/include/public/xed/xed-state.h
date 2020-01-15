@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -109,9 +109,7 @@ static XED_INLINE xed_bool_t xed_state_long64_mode(const xed_state_t* p) {
 
 /// @ingroup INIT
 static XED_INLINE xed_bool_t xed_state_real_mode(const xed_state_t* p) {
-    xed_machine_mode_enum_t mmode = xed_state_get_machine_mode(p);
-    return ( mmode == XED_MACHINE_MODE_REAL_16  ||
-             mmode == XED_MACHINE_MODE_REAL_32 );
+    return (xed_state_get_machine_mode(p) == XED_MACHINE_MODE_REAL_16);
 }
 
 /// @ingroup INIT
@@ -148,7 +146,6 @@ xed_state_get_address_width(const xed_state_t* p)
         return XED_ADDRESS_WIDTH_64b;
 
       case XED_MACHINE_MODE_REAL_16:
-      case XED_MACHINE_MODE_REAL_32:
         /* should be 20b... but if you are working w/real mode then you're
            going to have to deal with somehow. Could easily make this be
            20b if anyone cares. */

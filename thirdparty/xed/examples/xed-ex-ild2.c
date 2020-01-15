@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ END_LEGAL */
 int main(int argc, char** argv);
 
 #include "xed/xed-interface.h"
+#include "xed/xed-get-time.h"
 
 #define BUFLEN  1024
 #define XDPRINT(x)     printf("%23s = %d\n", #x , i-> x );

@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ END_LEGAL */
 
 #   include "xed-portability.h"
 #   include "xed-types.h"
+
 #   if defined(__INTEL_COMPILER) && __INTEL_COMPILER > 810  && !defined(_M_IA64)
 #      include <ia32intrin.h>
 #   endif
@@ -35,39 +36,37 @@ END_LEGAL */
 #         include <intrin.h>
 #         pragma intrinsic(__rdtsc)
 #      endif
-#      if defined(__GNUC__)
-#         include <x86intrin.h>
-#      endif
 #   endif
 
 
+///xed_get_time() must be compiled with gnu99 on linux to enable the asm()
+///statements. If not gnu99, then xed_get_time() returns zero with gcc. GCC
+///has no intrinsic for rdtsc. (The default for XED is to compile with
+///-std=c99.)  GCC allows __asm__ even under c99!
 static XED_INLINE  xed_uint64_t xed_get_time(void) {
     xed_union64_t ticks;
-#   if defined(__GNUC__) 
+    // __STRICT_ANSI__ comes from the -std=c99
+#   if defined(__GNUC__) //&& !defined(__STRICT_ANSI__)
 #      if defined(__i386__) || defined(i386) || defined(i686) || defined(__x86_64__)
-#         if __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9 && __GNUC_PATCHLEVEL__ >= 3)
-               ticks.u64 = __rdtsc();
-#         else            
-               __asm__ volatile ("rdtsc":"=a" (ticks.s.lo32), "=d"(ticks.s.hi32));
-#         endif               
-#         define XED_FOUND_RDTSC
+          __asm__ volatile ("rdtsc":"=a" (ticks.s.lo32), "=d"(ticks.s.hi32));
+#         define FOUND_RDTSC
 #      endif
 #   endif
 #   if defined(__INTEL_COMPILER) &&  __INTEL_COMPILER>=810 && !defined(_M_IA64)
        ticks.u64 = __rdtsc();
-#      define XED_FOUND_RDTSC
+#      define FOUND_RDTSC
 #   endif
 #   if !defined(__INTEL_COMPILER)
-#      if !defined(XED_FOUND_RDTSC) && defined(_MSC_VER) && _MSC_VER >= 1400 && \
-                         !defined(_M_IA64) && !defined(_MANAGED)    /* MSVS7, 8 */
+#      if !defined(FOUND_RDTSC) && defined(_MSC_VER) && _MSC_VER >= 1400 && \
+                               !defined(_M_IA64) && !defined(_MANAGED)    /* MSVS7, 8 */
           ticks.u64 = __rdtsc();
-#         define XED_FOUND_RDTSC
+#         define FOUND_RDTSC
 #      endif
 #   endif
-#   if !defined(XED_FOUND_RDTSC)
+#   if !defined(FOUND_RDTSC)
        ticks.u64 = 0;
 #   endif
     return ticks.u64;
 }
-#undef XED_FOUND_RDTSC
+
 #endif

@@ -1,7 +1,7 @@
 1. Installation Prerequisites
   a. Install Oracle/OpenJDK and Apache Maven.
   b. cp set_env.template set_env
-  c. Modify set_env to make JXPerf_HOME, JAVA_HOME and MAVEN_HOME point to your JXPerf, Java and Maven home.
+  c. Modify set_env to make OJXPerf_HOME, JAVA_HOME and MAVEN_HOME point to your OJXPerf, Java and Maven home.
   d. source set_env
 
 2. Installation
@@ -10,28 +10,7 @@
 3. Uninstallation
   a. make clean
 
-4. To run dead store detection
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=DeadStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
+4. To run object-level redundancy detection
+  a. LD_PRELOAD=$OJXPerf_HOME/build/libpreload.so java -javaagent:$JAVA_AGENT -agentpath:$OJXPerf_HOME/build/libagent.so=OBJLEVEL::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java program>
+  b. python $OJXPerf_HOME/process_raw_data.py
     1) A dump file named "agent-data" would be generated
-
-5. To run silent store detection
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
-    1) A dump file named "agent-data" would be generated
-
-6. To run silent load detection
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentLoad::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
-    1) A dump file named "agent-data" would be generated
-
-7. To run data centric analysis
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -XX:+UseConcMarkSweepGC -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=DataCentric::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
-    1) A dump file named "agent-data" would be generated, which includes two metrics: "Allocation Times" and "L1 Cache Misses"
-      a) The metric "Allocation Times" reports allocation times for every object, which is represented with the object allocation site
-      b) The metric "L1 Cache Misses" reports a pair of calling context (i.e., <allocation site, access site>) for every object incurring L1 cache misses
-      c) To analyze memory bloat
-        (1) Identify the objects suffering from high L1 cache misses by looking into the metric "L1 Cache Misses" 
-        (2) Check whether these objects have high allocation times by looking into the metric "Allocation Times" 
-        (3) The objects having both high L1 cache misses and allocation times are primary optimization candidates

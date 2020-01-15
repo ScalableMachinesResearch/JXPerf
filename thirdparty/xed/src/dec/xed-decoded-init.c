@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -20,22 +20,20 @@ END_LEGAL */
 #include "xed-decoded-inst.h"
 #include "xed-operand-values-interface.h"
 #include <string.h> // memset
+
 /* INITIALIZATION */
-static XED_INLINE void zero_inst(xed_decoded_inst_t* p)
-{
-    memset(p,0,sizeof(xed_decoded_inst_t));
-}
+
 XED_DLL_EXPORT void
 xed_decoded_inst_zero_set_mode(xed_decoded_inst_t* p,
                                const xed_state_t* dstate)
 {
-    zero_inst(p);
+    memset(p, 0, sizeof(xed_decoded_inst_t));
     xed_operand_values_set_mode(p,dstate);
 }
-
+    
 XED_DLL_EXPORT void
 xed_decoded_inst_zero(xed_decoded_inst_t* p) {
-    zero_inst(p);
+    memset(p, 0, sizeof(xed_decoded_inst_t));
 }
 
 XED_DLL_EXPORT void

@@ -1,5 +1,5 @@
-export JXPerf_HOME=<your JXPerf home>
+export OJXPerf_HOME=<your OJXPerf home>
 export JAVA_HOME=<your Java home>
 export MAVEN_HOME=<your Maven home>
 export PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH
-export JAVA_AGENT=$JXPerf_HOME/thirdparty/modified_allocation_callback/target/java-allocation-instrumenter-3.1.0.jar
+export JAVA_AGENT=$OJXPerf_HOME/thirdparty/modified_allocation_callback/target/java-allocation-instrumenter-3.1.0.jar

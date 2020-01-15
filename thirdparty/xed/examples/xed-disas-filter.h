@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ Copyright (c) 2019 Intel Corporation
   
 END_LEGAL */
 
-xed_uint_t disas_filter(xed_decoded_inst_t *inst, char *prefix, xed_disas_info_t *di);
+int disas_filter(xed_decoded_inst_t *inst, char *prefix, xed_disas_info_t *di);

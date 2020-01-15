@@ -1,6 +1,6 @@
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 #  
 #END_LEGAL
 
+import collections
 import actions
+import types
+import sys
 
 class actions_codegen_t(object):
     ''' This file is about:
@@ -62,9 +65,9 @@ class actions_codegen_t(object):
         
         all_fbs = set()
         common_fbs = fbs_bin[0]
-        for xbin in fbs_bin:
-            all_fbs.update(xbin)
-            common_fbs.intersection_update(xbin)
+        for bin in fbs_bin:
+            all_fbs.update(bin)
+            common_fbs.intersection_update(bin)
         
         return sorted(all_fbs), common_fbs
     
@@ -181,14 +184,14 @@ class actions_codegen_t(object):
         self.ret_action = False
         self.has_emit = self._has_emit(rules)
         
-        for tupl, rule in tuple2rule.items():
+        for tuple, rule in tuple2rule.items():
             actions = self._create_fb_actions(self.all_fbs, self.common_fbs, rule)
             nts = self._create_nt_actions(rule.actions)
             ntlufs = self._create_ntluf_actions(rule.actions)
             ret_action = self._get_return_action(rule.actions)
             if ret_action:
                 self.ret_action = True
-            tuple2actions[tupl] = actions + nts + ntlufs + ret_action
+            tuple2actions[tuple] = actions + nts + ntlufs + ret_action
          
             
         return tuple2actions
@@ -311,7 +314,8 @@ class actions_codegen_t(object):
         ''' get the c type of the return action ''' 
         if self._has_return_stmt():
             return self.strings_dict['return_type'] 
-        return 'void' 
+        else:
+            return 'void' 
         
     def emit_default(self):
         ''' emit the action taken when we did not hit a valid hash table entry

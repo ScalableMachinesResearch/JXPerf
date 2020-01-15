@@ -2,7 +2,7 @@
 # -*- python -*-
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -18,15 +18,25 @@
 #  
 #END_LEGAL
 from __future__ import print_function
+import os
 import sys
+import argparse
 import re
 import collections
 
 import read_xed_db
-import gen_setup
+
+def die(s):
+    sys.stdout.write("ERROR: {0}\n".format(s))
+    sys.exit(1)
+def msgb(b,s=''):
+    sys.stdout.write("[{0}] {1}\n".format(b,s))
+
+
 
 def work(args):  # main function
-    gen_setup.msge("READING XED DB")
+    msgb("READING XED DB")
+
 
     xeddb = read_xed_db.xed_reader_t(args.state_bits_filename,
                                      args.instructions_filename,
@@ -56,8 +66,22 @@ def work(args):  # main function
     return 0
 
 
+def setup():
+    parser = argparse.ArgumentParser(
+        description='Generate instruction counts per chip')
+    parser.add_argument('state_bits_filename', 
+                        help='Input state bits file')
+    parser.add_argument('instructions_filename', 
+                        help='Input instructions file')
+    parser.add_argument('widths_filename', 
+                        help='Input chip file')
+    parser.add_argument('element_types_filename', 
+                        help='Input chip file')
+    args = parser.parse_args()
+    return args
+
 if __name__ == "__main__":
-    args = gen_setup.setup('Generate operand lists')
+    args = setup()
     r = work(args)
     sys.exit(r)
 

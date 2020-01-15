@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ Copyright (c) 2019 Intel Corporation
   
 END_LEGAL */
 
-#include <assert.h>
+
 #include "xed/xed-interface.h"
 #include "xed-examples-util.h"
 #include "xed-symbol-table.h"
@@ -46,7 +46,6 @@ xed_local_symbol_table_t* xst_make_local_map(xed_symbol_table_t* p,
 {
     xed_local_symbol_table_t* n =
         (xed_local_symbol_table_t*) malloc(sizeof(xed_local_symbol_table_t));
-    assert(n!=0);
     xed_local_symbol_table_init(n);
     avl_insert(&p->avl_lmap, section, n, 0);
     return n;
@@ -138,9 +137,9 @@ int xed_disassembly_callback_function(
         char* symbol  = get_symbol(symbol_address, caller_data);
         if (symbol) {
             if (xed_strlen(symbol) < buffer_length)
-                xed_strncpy(symbol_buffer, symbol, (int)buffer_length);
+                xed_strncpy(symbol_buffer, symbol, buffer_length);
             else {
-                xed_strncpy(symbol_buffer, symbol, (int)(buffer_length-1));
+                xed_strncpy(symbol_buffer, symbol, buffer_length-1);
                 symbol_buffer[buffer_length-1]=0;
             }
             *offset = address - symbol_address;

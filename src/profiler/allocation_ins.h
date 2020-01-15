@@ -4,6 +4,7 @@
 
 #include <jni.h>
 #include "profiler.h"
+#include "profiler_support.h"
 #include "safe-sampling.h"
 #include "splay.h"
 #include "lock.h"

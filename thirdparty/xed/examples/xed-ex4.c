@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -86,16 +86,12 @@ main(int argc, char** argv)
     xed_decoded_inst_set_mode(&xedd, mmode, stack_addr_width);
 
     for(  ;i < argc; i++)    {
-        if (strlen(argv[i]) != 2) {
-            fprintf(stderr, "not two hex characters: \"%s\"\n", argv[i]);
-            exit(1);
-        }
         xed_uint8_t x = (xed_uint8_t)(xed_atoi_hex(argv[i]));
         assert(bytes < XED_MAX_INSTRUCTION_BYTES);
         itext[bytes++] = x;
     }
     if (bytes == 0)    {
-        fprintf(stderr, "Must supply some hex bytes, e.g., 48 89 C0\n");
+        fprintf(stderr, "Must supply some hex bytes\n");
         exit(1);
     }
 

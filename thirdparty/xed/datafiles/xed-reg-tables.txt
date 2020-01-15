@@ -1,6 +1,6 @@
 #BEGIN_LEGAL
 #
-#Copyright (c) 2019 Intel Corporation
+#Copyright (c) 2018 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -139,17 +139,6 @@ xed_reg_enum_t OrDX()::
 EOSZ=1 | OUTREG=XED_REG_DX
 EOSZ=2 | OUTREG=XED_REG_EDX
 EOSZ=3 | OUTREG=XED_REG_RDX
-
-# only used for VIA PADLOCK ISA:
-xed_reg_enum_t OrCX()::
-EOSZ=1 | OUTREG=XED_REG_CX
-EOSZ=2 | OUTREG=XED_REG_ECX
-EOSZ=3 | OUTREG=XED_REG_RCX
-# only used for VIA PADLOCK ISA:
-xed_reg_enum_t OrBX()::
-EOSZ=1 | OUTREG=XED_REG_BX
-EOSZ=2 | OUTREG=XED_REG_EBX
-EOSZ=3 | OUTREG=XED_REG_RBX
 
 xed_reg_enum_t OrSP()::
 EOSZ=1 | OUTREG=XED_REG_SP

@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -131,7 +131,7 @@ xed_decoded_inst_has_mpx_prefix(const xed_decoded_inst_t* p){
 xed_uint8_t
 xed_decoded_inst_get_modrm(const xed_decoded_inst_t* p)
 {
-    return XED_STATIC_CAST(xed_uint8_t,xed3_operand_get_modrm_byte(p));
+    return xed3_operand_get_modrm_byte(p);
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -623,7 +623,8 @@ xed_decoded_inst_operand_element_size_bits(
 
 xed_operand_element_type_enum_t
 xed_decoded_inst_operand_element_type(const xed_decoded_inst_t* p, 
-                                      unsigned int operand_index)
+                                      unsigned int operand_index,
+                                      xed_operand_element_xtype_enum_t* xx_type)
 {
     xed_operand_element_type_enum_t dtype = XED_OPERAND_ELEMENT_TYPE_INVALID;    
     const xed_inst_t* inst = p->_inst;
@@ -639,6 +640,7 @@ xed_decoded_inst_operand_element_type(const xed_decoded_inst_t* p,
         return dtype;
 
     xtype = xed_operand_xtype(o);
+    *xx_type = xtype;
     if ( xtype < XED_OPERAND_XTYPE_LAST) {
 
         const xed_operand_type_info_t* q = xed_operand_xtype_info+xtype;
@@ -646,12 +648,11 @@ xed_decoded_inst_operand_element_type(const xed_decoded_inst_t* p,
         /* This is a catch case for the register NTs that do not have 
            type codes. It is not 100% accurate */
         if (dtype == XED_OPERAND_ELEMENT_TYPE_INVALID) 
-            return XED_OPERAND_ELEMENT_TYPE_INT;
-#if defined(XED_SUPPORTS_KNC)
+            return XED_OPERAND_ELEMENT_TYPE_FLOAT16; 
+            //return XED_OPERAND_ELEMENT_TYPE_INT; 
         else if (dtype == XED_OPERAND_ELEMENT_TYPE_VARIABLE) 
             dtype = XED_STATIC_CAST(xed_operand_element_type_enum_t,
                                     xed3_operand_get_type(p));
-#endif
     }
     return dtype;
 }
@@ -678,7 +679,7 @@ xed_decoded_inst__compute_masked_immediate( const xed_decoded_inst_t* p)
     if (xed_operand_values_get_effective_operand_width(p) == 64)
         mask = 0x3F;
     xed_assert(xed3_operand_get_imm_width(p) == 8);
-    imm_byte = XED_STATIC_CAST(xed_uint8_t,xed3_operand_get_uimm0(p));
+    imm_byte = xed3_operand_get_uimm0(p);
     masked_imm_byte = imm_byte & mask;
     return masked_imm_byte;
 }
@@ -874,7 +875,7 @@ xed_decoded_inst_masked_vector_operation(xed_decoded_inst_t* p)
 
 
 xed_uint_t
-xed_decoded_inst_get_nprefixes(const xed_decoded_inst_t* p) {
+xed_decoded_inst_get_nprefixes(xed_decoded_inst_t* p) {
     return xed3_operand_get_nprefixes(p);
 }
 
@@ -889,20 +890,13 @@ xed_bool_t xed_decoded_inst_masking(const xed_decoded_inst_t* p) {
 xed_bool_t xed_decoded_inst_merging(const xed_decoded_inst_t* p) {
 #if defined(XED_SUPPORTS_AVX512) || defined(XED_SUPPORTS_KNC)
     if (xed3_operand_get_mask(p) != 0)
-    {
 #   if defined(XED_SUPPORTS_AVX512)
-        const xed_inst_t* xi = xed_decoded_inst_inst(p);
-        const xed_operand_t* op = xed_inst_operand(xi,0); // 0'th operand.
-        if (xed_operand_width(op) == XED_OPERAND_WIDTH_MSKW) // mask dest -> always zeroing
-            return 0;
-                
         if (xed3_operand_get_zeroing(p) == 0)
             if (!xed_decoded_inst_get_attribute(p, XED_ATTRIBUTE_MASK_AS_CONTROL))            
                 return 1;
 #   elif defined(XED_SUPPORTS_KNC)
         return 1;
 #   endif
-    }
 #endif
     return 0;
     (void)p; //pacify compiler
@@ -921,6 +915,7 @@ xed_operand_action_enum_t
 xed_decoded_inst_operand_action(const xed_decoded_inst_t* p,
                                 unsigned int operand_index)
 {
+
     /* For the 0th operand, except for stores and except if attribute MASK_AS_CONTROL
                              RW             W   <<< SDM/XED notion
       ===========================================
@@ -931,8 +926,6 @@ xed_decoded_inst_operand_action(const xed_decoded_inst_t* p,
       aaa!=0  control     n/a             w
       aaa!=0  merging     r+cw            r+cw  <<< This one requires special handling
       aaa!=0  zeroing     r+w             w
-
-      special case: things that write mask reg dests  have EVEX.z==0 but never merge.
      */
     
     const xed_inst_t* xi = xed_decoded_inst_inst(p);
@@ -941,8 +934,7 @@ xed_decoded_inst_operand_action(const xed_decoded_inst_t* p,
 
     if (operand_index == 0)
     {
-        if ( xed_decoded_inst_masking(p)  &&
-             xed_decoded_inst_merging(p)   )
+        if (xed_decoded_inst_masking(p) && xed_decoded_inst_merging(p))
         {
             if (rw == XED_OPERAND_ACTION_RW)
                 return XED_OPERAND_ACTION_RCW;

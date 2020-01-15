@@ -51,11 +51,10 @@ import mbuild
 
 def write_file(fn,lines):
     print("[EMIT] %s" % (fn))
-    # write the file in binary mode to prevent LF -> CR LF expansion on Windows
-    f = open(fn,"wb")
+    f = open(fn,"w")
     if lines:
         for line in lines:
-            f.write(line.replace('\r', '')) # gobble CR symbols if any
+            f.write(line)
     f.close()
 
 
@@ -94,8 +93,7 @@ def make_bulk_tests(env):
     for bulk_test_file in  env['bulk_tests']:
         print("[READING BULK TESTS] %s" % (bulk_test_file))
         tests = open(bulk_test_file,'r').readlines()
-        tests = [ re.sub(r"#.*",'',x) for x in tests] # remove comments
-        tests = [ x.strip() for x in tests]  # remove leading/trailing whitespace, newlines
+        tests = [ x.strip() for x in tests]
         for test in tests:
             if test:
                 si = mbuild.join(env['otests'],"test-%05d" % (i))
@@ -136,17 +134,6 @@ def all_codes_present(specified_codes, test_codes):
             return False
     return True 
 
-def _prep_stream(strm,name):
-    if len(strm) == 1:
-        strm= strm[0].split("\n")
-    if len(strm) == 1 and strm[0] == '':
-        strm = []
-    if len(strm) > 0 and len(strm[-1]) == 0:
-        strm.pop()
-    for line in strm:
-        print("[{}] {} {}".format(name,len(line),line))
-    return strm
-
 def one_test(env,test_dir):
 
     cmd_fn = os.path.join(test_dir,"cmd")
@@ -161,9 +148,23 @@ def one_test(env,test_dir):
     (retcode, stdout,stderr) = mbuild.run_command(cmd2,separate_stderr=True)
     print("Retcode %s" % (str(retcode)))
     if stdout:
-        stdout = _prep_stream(stdout,"STDOUT")
+        if len(stdout) == 1:
+            stdout= stdout[0].split("\n")
+        if len(stdout) == 1 and stdout[0] == '':
+            stdout = []
+        if len(stdout) > 0 and len(stdout[-1]) == 0:
+            stdout.pop()
+        for line in stdout:
+            print("[STDOUT] %d %s" % (len(line),line))
     if stderr:
-        stderr = _prep_stream(stderr,"STDERR")
+        if len(stderr) == 1:
+            stderr= stderr[0].split("\n")
+        if len(stderr) == 1 and stderr[0] == '':
+            stderr = []
+        for line in stderr:
+            print("[STDERR] %s" % (line))
+
+
 
     ret_match = compare_file(os.path.join(test_dir,"retcode.reference"), [ str(retcode) ])
     stdout_match = compare_file(os.path.join(test_dir,"stdout.reference"), stdout)
@@ -263,7 +264,7 @@ def work():
                           action="append",
                           default=[], 
                           help="Codes for test subsetting (DEC, ENC, AVX, " 
-                             + "AVX512X, AVX512PF, XOP, VIA, KNC)." 
+                             + "AVX512X, AVX512PF, XOP, KNC)." 
                              + " Only used for running tests, not creating them.")
     env.parse_args()
 

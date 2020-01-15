@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2019 Intel Corporation
+Copyright (c) 2018 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ xed_decoded_inst_compute_memory_operand_length(const xed_decoded_inst_t* p,
 static XED_INLINE void
 xed_decoded_inst_cache_memory_operand_length(xed_decoded_inst_t* p) {
     xed_uint16_t mem_width =
-        (xed_uint16_t)xed_decoded_inst_compute_memory_operand_length(p, 0);
+        xed_decoded_inst_compute_memory_operand_length(p, 0);
     xed3_operand_set_mem_width(p,mem_width);
 }
 
