@@ -24,7 +24,7 @@ def get_all_files(directory):
 			if tid not in ret_dict:
 				ret_dict[tid] = []
 			ret_dict[tid].append(os.path.join(directory,f))
-	return ret_dict	
+	return ret_dict
 
 def parse_input_file(file_path, level_one_node_tag):
 	print "parsing", file_path
@@ -68,7 +68,7 @@ def load_method(method_root):
 				assert(range_xml.name() == "range")
 				start = range_xml.getAttr("start")
 				end = range_xml.getAttr("end")
-				lineno = range_xml.getAttr("data")	
+				lineno = range_xml.getAttr("data")
 
 				m.addAddr2Line((start,end),lineno)
 
@@ -80,7 +80,7 @@ def load_method(method_root):
 				lineno = range_xml.getAttr("data")	
 
 				m.addBCI2Line((start,end),lineno)
-			
+
 		method_manager.addMethod(m)
 	return method_manager
 
@@ -88,7 +88,7 @@ def load_context(context_root):
 	context_manager = context.ContextManager()
 	print "It has ", len(context_root.getChildren()), " contexts"
 	for ctxt_xml in context_root.getChildren():
-		
+
 		ctxt = context.Context(ctxt_xml.getAttr("id"))
 		# set fields
 		ctxt.method_version = ctxt_xml.getAttr("method_version")
@@ -96,7 +96,7 @@ def load_context(context_root):
 		ctxt.method_id = ctxt_xml.getAttr("method_id")
 		ctxt.bci = ctxt_xml.getAttr("bci")
 		ctxt.setParentID(ctxt_xml.getAttr("parent_id"))
-	    	
+
 		metrics_xml = None
 		for c_xml in ctxt_xml.getChildren():
 			if c_xml.name() == "metrics":
@@ -122,7 +122,7 @@ def load_context(context_root):
 				    		assert(not(attr_dict.has_key("value1")))
 				    		ctxt.metrics_dict["value"] = attr_dict["value2"]
 				    		ctxt.metrics_type = "FP"
-		
+
 		## add it to context manager
 		context_manager.addContext(ctxt)
 	roots = context_manager.getRoots()
@@ -162,12 +162,12 @@ def output_to_file(method_manager, context_manager, dump_data, dump_data2):
 						dump_data[key] += (ctxt_list[-1].metrics_dict["value"])
 					else:
 						dump_data[key] = (ctxt_list[-1].metrics_dict["value"])
-				elif ctxt_list[-1].metrics_type == "FP": 
+				elif ctxt_list[-1].metrics_type == "FP":
 					if dump_data2.has_key(key):
 						dump_data2[key] += (ctxt_list[-1].metrics_dict["value"])
 					else:
 						dump_data2[key] = (ctxt_list[-1].metrics_dict["value"])
-			
+
 def main():
 	file = open("agent-statistics.run", "r")
 	result = file.read().splitlines()
@@ -177,7 +177,7 @@ def main():
 	if result[0] == 'DATACENTRIC':
 		isDataCentric = True
 		result = result[1:]
-	
+
 	### read all agent trace files
 	tid_file_dict = get_all_files(".")
 
@@ -197,13 +197,13 @@ def main():
 			root.addChildren(new_root.getChildren())
 		if len(root.getChildren()) > 0:
 			xml_root_dict[tid] = root
-		
+
 	### reconstruct method
 	print("start to load methods")
 	method_root = xml_root_dict["method"]
 	method_manager = load_method(method_root)
 	print("Finished loading methods")
-		
+
 	print("Start to output")
 	
 	dump_data = dict()
@@ -236,7 +236,7 @@ def main():
 			rows = sorted(dump_data2.items(), key=lambda x: x[-1], reverse = True)
 			for row in rows:
 				file.write(row[0]  + "\n\nFraction: " +  str(round(float(row[-1]) * 100 / deadOrRedBytes, 2)) +"%\n")
-	
+
 		file.write("\nTotal Bytes: " + result[0])
 		file.write("\nTotal Redundant Bytes: " + result[1])
 		if len(result) == 4:
@@ -247,9 +247,9 @@ def main():
 		assert(len(result) == 2)
 		allocTimes = long(result[0])
 		l1CacheMisses = long(result[1])
-		if allocTimes != 0:	
+		if allocTimes != 0:
 			file.write("-----------------------Allocation Times------------------------------\n")
-			
+
 			rows = sorted(dump_data.items(), key=lambda x: x[-1], reverse = True)
 			for row in rows:
 				file.write(row[0] + "\n\nFraction: " + str(round(float(row[-1]) * 100 / allocTimes, 2)) +"%\n")
@@ -266,7 +266,7 @@ def main():
 	file.close()
 
 	print("Final dumping")
-	
+
 	remove_all_files(".") 
-	
+
 main()
