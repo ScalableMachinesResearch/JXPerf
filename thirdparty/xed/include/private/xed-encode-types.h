@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ typedef struct xed_encoder_iform_s{
     xed_uint8_t _legacy_map;
     
     //start index of the field values in xed_encode_fb_values_table
-    xed_int16_t _fb_values_index;    
+    xed_uint16_t _fb_values_index;    
 } xed_encoder_iform_t;
 
 typedef struct xed_encoder_vars_s {

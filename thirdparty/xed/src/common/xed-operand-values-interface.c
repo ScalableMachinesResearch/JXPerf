@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -28,10 +28,12 @@ END_LEGAL */
 #include "xed-operand-ctype-map.h"
 #include "xed-reg-class.h"
 #include "xed-operand-accessors.h"
-#include <string.h> //memset
 
 void xed_operand_values_init(xed_operand_values_t* p) {
-    memset(&(p->_operands),0,sizeof(xed_operand_storage_t));
+    unsigned int i;
+    xed_uint32_t* xp = (xed_uint32_t*)p;
+    for(i=0;i<sizeof(xed_operand_storage_t)/4;i++)
+        xp[i]=0;
 }
 
 void xed_operand_values_init_keep_mode( xed_operand_values_t* dst,
@@ -72,6 +74,11 @@ void xed_operand_values_set_mode(xed_operand_values_t* p,
       case XED_MACHINE_MODE_REAL_16:
         xed3_operand_set_realmode(p,1);
         xed3_operand_set_mode(p,0);
+        break;
+        
+      case XED_MACHINE_MODE_REAL_32:
+        xed3_operand_set_realmode(p,1);
+        xed3_operand_set_mode(p,1);
         break;
 
       case XED_MACHINE_MODE_LEGACY_16:
@@ -606,7 +613,7 @@ xed_operand_values_set_effective_address_width(xed_operand_values_t* p,
 void
 xed_operand_values_set_memory_operand_length(xed_operand_values_t* p,
                                              unsigned int memop_length) {
-    xed3_operand_set_mem_width(p,XED_STATIC_CAST(xed_uint32_t,memop_length));
+    xed3_operand_set_mem_width(p,XED_STATIC_CAST(xed_uint16_t,memop_length));
 }
 
 unsigned int
@@ -638,7 +645,7 @@ xed_operand_values_set_memory_displacement_bits(xed_operand_values_t* p,
     else{
         xed3_operand_set_disp(p,x); 
     }
-    xed3_operand_set_disp_width(p,len);
+    xed3_operand_set_disp_width(p, XED_STATIC_CAST(xed_uint8_t, len));
 }
 
 void
@@ -661,7 +668,7 @@ xed_operand_values_set_branch_displacement_bits(xed_operand_values_t* p,
     else{
         xed3_operand_set_disp(p,x);
     }
-    xed3_operand_set_brdisp_width(p,XED_STATIC_CAST(xed_uint16_t,len));
+    xed3_operand_set_brdisp_width(p,XED_STATIC_CAST(xed_uint8_t,len));
 
 }
 
@@ -701,7 +708,7 @@ void xed_operand_values_set_immediate_unsigned_bits(xed_operand_values_t* p,
         xed3_operand_set_uimm0(p,x);
     }
     
-    xed3_operand_set_imm_width(p,bits);
+    xed3_operand_set_imm_width(p, XED_STATIC_CAST(xed_uint8_t,bits));
     xed3_operand_set_imm0signed(p,0);
 }
 
@@ -1022,11 +1029,6 @@ xed_operand_values_dump(    const xed_operand_values_t* ov,
                           }
                           break;
                       }
-                      case XED_OPERAND_CTYPE_XED_OPERAND_ELEMENT_TYPE_ENUM_T: { 
-                          //not printed currently
-                          break;
-                      }
-                                        
                       default:
                         blen = xed_strncat(buf,"NOT HANDLING CTYPE ",blen);
                         blen = xed_strncat(buf, xed_operand_ctype_enum_t2str(ctype),blen);

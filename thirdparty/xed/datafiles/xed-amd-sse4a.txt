@@ -1,6 +1,6 @@
 #BEGIN_LEGAL
 #
-#Copyright (c) 2018 Intel Corporation
+#Copyright (c) 2019 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ CATEGORY  : BITBYTE
 EXTENSION : SSE4a
 ATTRIBUTES : ATT_OPERAND_ORDER_EXCEPTION AMDONLY
 PATTERN   : 0x0F 0x78 osz_refining_prefix REFINING66() MOD[0b11] MOD=3 REG[0b000] RM[nnn] UIMM8() UIMM8_1()
-OPERANDS  : REG0=XMM_R():w:q      IMM0:r:b IMM1:r:b
+OPERANDS  : REG0=XMM_B():w:q      IMM0:r:b IMM1:r:b
 PATTERN   : 0x0F 0x79 osz_refining_prefix REFINING66() MOD[0b11] MOD=3 REG[rrr] RM[nnn] 
 OPERANDS  : REG0=XMM_R():w:q      REG1=XMM_B():r:dq    
 }

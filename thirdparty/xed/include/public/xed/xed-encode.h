@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -54,18 +54,6 @@ XED_DLL_EXPORT void
 xed_encoder_request_set_iclass( xed_encoder_request_t* p, 
                                 xed_iclass_enum_t iclass);
 
-/// @name Prefixes
-//@{
-/// @ingroup ENC
-/// for  REPNE(F2) prefix on string ops
-XED_DLL_EXPORT void xed_encoder_request_set_repne(xed_encoder_request_t* p);
-/// @ingroup ENC
-/// for REP(F3) prefix on string ops
-XED_DLL_EXPORT void xed_encoder_request_set_rep(xed_encoder_request_t* p);
-/// @ingroup ENC
-/// clear the REP prefix indicator
-XED_DLL_EXPORT void xed_encoder_request_clear_rep(xed_encoder_request_t* p);
-//@}
 
 /// @name Primary Encode Functions
 //@{
@@ -211,11 +199,15 @@ xed_encoder_request_set_scale(xed_encoder_request_t* p,
 
 //////////////////////////////////////////////
 /// @ingroup ENC
-XED_DLL_EXPORT const xed_operand_values_t*
-xed_encoder_request_operands_const(const xed_encoder_request_t* p);
+static XED_INLINE const xed_operand_values_t*
+xed_encoder_request_operands_const(const xed_encoder_request_t* p) {
+    return p;
+}
 /// @ingroup ENC
-XED_DLL_EXPORT xed_operand_values_t*
-xed_encoder_request_operands(xed_encoder_request_t* p);
+static XED_INLINE xed_operand_values_t*
+xed_encoder_request_operands(xed_encoder_request_t* p) {
+    return p;
+}
 
 /// @name Initialization
 //@{

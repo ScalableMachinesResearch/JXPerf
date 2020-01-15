@@ -2,11 +2,8 @@
 #define x86_misc_h
 
 #include "profiler_support.h"
-extern "C" {
-#include "xed/xed-interface.h"
-}
 
-bool get_mem_access_length_and_type_address(void * ip, uint32_t *accessLen, AccessType *accessType, FloatType * floatType, void * context, void** address, xed_operand_element_xtype_enum_t* xx_type);
+bool get_mem_access_length_and_type_address(void * ip, uint32_t *accessLen, AccessType *accessType, FloatType * floatType, void * context, void** address);
 bool get_mem_access_length_and_type(void * ip, uint32_t *accessLen, AccessType *accessType);
 // void decode_method(const void *method_start_addr, const void *method_end_addr, const void * first_pc);
 void *get_previous_instruction(const void *method_start_addr, const void *method_end_addr, const void *ins, void *excludeList[], int numExcludes);

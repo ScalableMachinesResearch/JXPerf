@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ END_LEGAL */
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 int main(int argc, char** argv);
 static int intel_asm_emit = 0;
@@ -114,7 +115,10 @@ static void print_intel_asm_emit(const xed_uint8_t* array, unsigned int olen) {
 }
 
 static unsigned int disas_encode(const xed_state_t* dstate,
-                                 const char* encode_text) {
+                                 const char* encode_text,
+                                 xed_operand_enum_t operand,
+                                 xed_uint32_t operand_value)
+{
     char buf[5000];
     xed_uint8_t array[XED_MAX_INSTRUCTION_BYTES];
     unsigned int ilen = XED_MAX_INSTRUCTION_BYTES;
@@ -126,6 +130,10 @@ static unsigned int disas_encode(const xed_state_t* dstate,
     areq.dstate = *dstate;
     areq.command = encode_text;
     req = parse_encode_request(areq);
+
+    if (operand != XED_OPERAND_INVALID)
+        xed3_set_generic_operand(&req, operand, operand_value);
+
     xed_encode_request_print(&req, buf, 5000);
     printf("Request: %s", buf);
 
@@ -163,7 +171,7 @@ static void xed_assemble(const xed_state_t* dstate,
                          const char* encode_file_name)
 {
 #define ASM_BUF_SIZE 1024
-    const xed_uint_t bsize = ASM_BUF_SIZE;
+    const xed_int_t bsize = ASM_BUF_SIZE;
     char buf[ASM_BUF_SIZE];
     FILE* f = fopen_portable(encode_file_name,"r");
     if (!f) {
@@ -206,6 +214,12 @@ static void xed_assemble(const xed_state_t* dstate,
     fclose(f);
 }
 #endif
+
+static void emit_version(void) {
+    printf("%s\n", xed_get_copyright());
+    printf("XED version: [%s]\n\n", xed_get_version());
+}
+
 static void usage(char* prog) {
     unsigned int i;
     static const char* usage_msg[] = {
@@ -271,6 +285,8 @@ static void usage(char* prog) {
       "",
       "\t-r            (for REAL_16 mode, 16b addressing (20b addresses),",
       "\t               16b default data size)",
+      "\t-r32          (for REAL_32 mode, 16b addressing (20b addresses),",
+      "\t               32b default data size)",
       "\t-16           (for LEGACY_16 mode, 16b addressing,",
       "\t               16b default data size)",
       "\t-32           (for LEGACY_32 mode, 32b addressing,",
@@ -291,16 +307,18 @@ static void usage(char* prog) {
       "",
       "\t-sp           (Search path for windows symbols)",
 #endif
+      "\t-version      (The version message)",
+      "\t-help         (This help message)",
       " ",
       0
     };      
 
-    printf("%s\n", xed_get_copyright());
-    printf("XED version: [%s]\n\n", xed_get_version());
+    emit_version();
     printf("Usage: %s [options]\n", prog);
     for(i=0; usage_msg[i]  ; i++)
         printf("%s\n", usage_msg[i]);
 }
+
  
 
 static char const* remove_spaces(char const*  s) { //frees original string
@@ -317,6 +335,7 @@ static char const* remove_spaces(char const*  s) { //frees original string
     }
     c++; // add the null
     p = (char*)malloc(c);
+    assert(p!=0);
     i=0;
     c=0;
     while(s[i]) {
@@ -359,8 +378,8 @@ int
 main(int argc, char** argv)
 {
     xed_bool_t sixty_four_bit = 0;
-    unsigned int mpx_mode = 0;
-    unsigned int cet_mode = 0;
+    xed_bool_t mpx_mode = 0;
+    xed_bool_t cet_mode = 0;
     xed_bool_t decode_only = 1;
     char* input_file_name = 0;
     char* symbol_search_path = 0;
@@ -368,7 +387,7 @@ main(int argc, char** argv)
     char const* encode_text=0;
     xed_state_t dstate;
     xed_bool_t encode = 0;
-    unsigned int ninst = 100*1000*1000; // FIXME: should use maxint...
+    xed_uint_t ninst = 100*1000*1000; // FIXME: should use maxint...
     //perf_tail is for skipping first insts in performance measure mode
     unsigned int perf_tail = 0;         
     xed_bool_t decode_encode = 0;
@@ -380,14 +399,14 @@ main(int argc, char** argv)
     char* target_section = 0;
     xed_bool_t use_binary_mode = 1;
     xed_bool_t emit_isa_set = 0;
-    xed_int64_t addr_start = 0;
-    xed_int64_t addr_end = 0;
-    xed_int64_t fake_base = 0;
+    xed_uint64_t addr_start = 0;
+    xed_uint64_t addr_end = 0;
+    xed_uint64_t fake_base = 0;
     xed_bool_t xml_format =0;
     xed_bool_t resync = 0;
     xed_bool_t ast = 0;
     xed_bool_t histo = 0;
-    int line_numbers = 0;
+    xed_bool_t line_numbers = 0;
     xed_chip_enum_t xed_chip = XED_CHIP_INVALID;
     xed_operand_enum_t operand = XED_OPERAND_INVALID;
     xed_uint32_t operand_value = 0;
@@ -547,7 +566,7 @@ main(int argc, char** argv)
 #endif
         else if (strcmp(argv[i],"-n") ==0)         {
             test_argc(i,argc);
-            ninst = XED_STATIC_CAST(unsigned int,
+            ninst = XED_STATIC_CAST(xed_uint_t,
                 xed_atoi_general(argv[i+1],1000));
             i++;
         }
@@ -560,19 +579,20 @@ main(int argc, char** argv)
         }
         else if (strcmp(argv[i],"-b") ==0)         {
             test_argc(i,argc);
-            fake_base = xed_atoi_general(argv[i+1],1000);
+            fake_base = (xed_uint64_t)xed_atoi_general(argv[i+1],1000);
             printf("ASSUMED BASE = " XED_FMT_LX "\n",fake_base);
             i++;
         }
         else if (strcmp(argv[i],"-as") == 0 || strcmp(argv[i],"-sa") == 0)    {
             test_argc(i,argc);
-            addr_start = XED_STATIC_CAST(xed_int64_t,
+            addr_start = XED_STATIC_CAST(xed_uint64_t,
                                          xed_atoi_general(argv[i+1],1000));
             i++;
         }
         else if (strcmp(argv[i],"-ae") == 0 || strcmp(argv[i],"-ea") == 0)    {
             test_argc(i,argc);
-            addr_end = XED_STATIC_CAST(xed_int64_t,xed_atoi_general(argv[i+1],1000));
+            addr_end = XED_STATIC_CAST(xed_uint64_t,
+                                       xed_atoi_general(argv[i+1],1000));
             i++;
         }
 
@@ -590,10 +610,10 @@ main(int argc, char** argv)
             i++;
         }
         else if (strcmp(argv[i],"-xv") ==0)        {
-            unsigned int xed_engine_verbose;
+            int xed_engine_verbose;
             test_argc(i,argc);
-            xed_engine_verbose = XED_STATIC_CAST(unsigned int,
-                                           xed_atoi_general(argv[i+1],1000));
+            xed_engine_verbose = XED_STATIC_CAST(xed_int_t,
+                                                 xed_atoi_general(argv[i+1],1000));
             xed_set_verbosity(xed_engine_verbose);
             i++;
         }
@@ -623,6 +643,12 @@ main(int argc, char** argv)
         }
         else if (strcmp(argv[i],"-isa-set")==0)   {
             emit_isa_set = 1;
+        }
+        else if (strcmp(argv[i],"-r32")==0)         {
+            sixty_four_bit = 0;
+            dstate.mmode = XED_MACHINE_MODE_REAL_32;
+            dstate.stack_addr_width = XED_ADDRESS_WIDTH_16b;
+            use_binary_mode = 0;
         }
         else if (strcmp(argv[i],"-r")==0)         {
             sixty_four_bit = 0;
@@ -666,7 +692,8 @@ main(int argc, char** argv)
         else if (strcmp(argv[i],"-set")==0) {
             test_argc(i+1,argc); // need 2 args
             operand = str2xed_operand_enum_t(argv[i+1]);
-            operand_value = xed_atoi_general(argv[i+2],1000);
+            operand_value = XED_STATIC_CAST(xed_uint32_t,
+                                            xed_atoi_general(argv[i+2],1000));
             i += 2;
         }
 #if 0
@@ -679,6 +706,10 @@ main(int argc, char** argv)
 #endif
         else if (strcmp(argv[i],"-emit") ==0) {
             intel_asm_emit = 1;
+        }
+        else if (strcmp(argv[i],"-version") == 0 ) {
+            emit_version();
+            exit(0);
         }
         else   {
             usage(argv[0]);
@@ -714,7 +745,10 @@ main(int argc, char** argv)
     if (CLIENT_VERBOSE2)
         printf("Done initialing XED tables.\n");
 
-    decode_text = remove_spaces(decode_text);
+    if (decode_text) {
+        decode_text = remove_spaces(decode_text);
+        assert(decode_text);
+    }
     
 #if defined(XED_DECODER)
     xed_format_set_options(format_options);
@@ -771,7 +805,7 @@ main(int argc, char** argv)
     if (filter)
     {
 #if defined(XED_DECODER)
-	retval_okay = disas_filter (&xedd, prefix, &decode_info);
+	retval_okay = disas_filter(&xedd, prefix, &decode_info);
 #endif
     } else
 #endif
@@ -785,6 +819,7 @@ main(int argc, char** argv)
     else if (decode_encode)
     {
 #if defined(XED_DECODER) && defined(XED_ENCODER)
+        assert(decode_text);
         obytes = disas_decode_encode(&decode_info,
                                      decode_text,
                                      &xedd,
@@ -795,7 +830,11 @@ main(int argc, char** argv)
     else if (encode)
     {
 #if defined(XED_ENCODER)
-        obytes = disas_encode(&dstate, encode_text);
+        assert(encode_text != 0);
+        obytes = disas_encode(&dstate,
+                              encode_text,
+                              operand,
+                              operand_value);
 #endif
     }
     else if (decode_text && strlen(decode_text) != 0)
@@ -816,14 +855,19 @@ main(int argc, char** argv)
         {
             char const* p = decode_text;
             // 2 bytes per nibble
-            int remaining = XED_STATIC_CAST(int,strlen(decode_text)) / 2; 
+            unsigned int remaining = (unsigned int)strlen(decode_text) / 2; 
             do {
                 unsigned int len;
                 retval_okay = disas_decode(&decode_info, p, &xedd, fake_base);
                 len = xed_decoded_inst_get_length(&xedd);
                 p+=len*2;
-                remaining -= len;
-                init_xedd(&xedd, &decode_info);
+                if (len < remaining) {
+                    remaining -= len;
+                    init_xedd(&xedd, &decode_info);
+                }
+                else {
+                    remaining = 0;
+                }
             }
             while(retval_okay && remaining > 0);
         }

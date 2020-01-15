@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -125,6 +125,11 @@ xed_decoded_inst_explicit_operand(const xed_decoded_inst_t* p)
 }
 
 
+static int buffer_remains(int buflen, char* ptr) {
+    int blen = buflen - XED_STATIC_CAST(int,xed_strlen(ptr));
+    return blen;
+}
+
 void
 xed_decoded_inst_dump(const xed_decoded_inst_t* p, char* buf, int buflen)
 {
@@ -151,7 +156,7 @@ xed_decoded_inst_dump(const xed_decoded_inst_t* p, char* buf, int buflen)
 
     t = buf + xed_strlen(buf);
     xed_operand_values_print_short( xed_decoded_inst_operands_const(p), t, blen);
-    blen = buflen - xed_strlen(buf);
+    blen = buffer_remains(buflen,buf);
 
     blen = xed_strncat(buf,"\n",blen);
     noperands = xed_inst_noperands(xi);
@@ -162,7 +167,7 @@ xed_decoded_inst_dump(const xed_decoded_inst_t* p, char* buf, int buflen)
         blen = xed_itoa(t,i,blen);
         blen = xed_strncat(buf,"\t\t",blen);
         xed_operand_print(op,buf+xed_strlen(buf),blen);
-        blen = buflen - xed_strlen(buf);
+        blen = buffer_remains(buflen,buf);
         blen = xed_strncat(buf,"\n",blen);
     }
 
@@ -295,7 +300,7 @@ xed_decoded_inst_dump_common(xed_print_info_t* pi)
 {
     const xed_operand_values_t* ov = xed_decoded_inst_operands_const(pi->p);  
 
-    int long_mode = xed_operand_values_get_long_mode(ov);
+    xed_bool_t long_mode = xed_operand_values_get_long_mode(ov);
     const xed_uint32_t dmode = xed_decoded_inst_get_machine_mode_bits(pi->p);
     int dmode16 = (dmode == 16);
     int dmode32 = (dmode == 32);
@@ -412,7 +417,7 @@ static void print_seg_prefix_for_suppressed_operands(
     const xed_operand_values_t* ov,
     const xed_operand_t*        op)
 {
-    int i;
+    xed_uint_t i;
     xed_operand_enum_t op_name = xed_operand_name(op);
     /* suppressed memops with nondefault segments get their segment printed */
     const xed_operand_enum_t names[] = { XED_OPERAND_MEM0,XED_OPERAND_MEM1};
@@ -450,7 +455,8 @@ xed_print_operand_decorations(
         int i;
         for( i=0; i<XED_MAX_DECORATIONS_PER_OPERAND; i++ )  {
             xed_operand_convert_enum_t v = xed_operand_convert[cvt_idx][i];
-            if (v == XED_OPERAND_CONVERT_INVALID)
+            if (v == XED_OPERAND_CONVERT_INVALID ||
+                v >=  XED_OPERAND_CONVERT_LAST    )
                 break;
             pi->blen = xed_print_cvt(pi->p, pi->buf, pi->blen, v);
         }
@@ -625,8 +631,9 @@ print_rel_sym(xed_print_info_t* pi,
      xed_uint64_t instruction_length = xed_decoded_inst_get_length(pi->p);
      xed_uint64_t pc = pi->runtime_address + instruction_length;
      xed_uint64_t effective_addr;
-     xed_bool_t long_mode, symbolic;
-     xed_uint_t bits_to_print;
+     xed_bool_t long_mode;
+     xed_int_t  symbolic;
+     xed_uint_t bits_to_print, eosz;
      char symbol[XED_SYMBOL_LEN];
      xed_uint64_t offset;
      const xed_bool_t leading_zeros = 0;
@@ -640,8 +647,13 @@ print_rel_sym(xed_print_info_t* pi,
                             xed_decoded_inst_operands_const(pi->p));
               
      bits_to_print = long_mode ? 8*8 :4*8;
-
+     
      effective_addr = (xed_uint64_t) ((xed_int64_t)pc  + disp);
+     
+     eosz = xed_operand_values_get_effective_operand_width(
+                         xed_decoded_inst_operands_const(pi->p));
+     if (eosz == 16) 
+         effective_addr = effective_addr & 0xFFFF;
 
      symbolic = xed_get_symbolic_disassembly(pi,
                                              effective_addr, 
@@ -835,6 +847,11 @@ static void xed_print_operand( xed_print_info_t* pi )
                           xed_pi_strcat(pi,"+");
                   }
                   xed_pi_strcat(pi,"0x");
+                  
+                  if (no_base_index && negative) 
+                      if (xed_operand_values_get_effective_address_width(ov) == 64)
+                          disp_bits = 64;
+
                   pi->blen = xed_itoa_hex_ul(pi->buf+xed_strlen(pi->buf),
                                                    disp,
                                                    disp_bits,
@@ -1113,7 +1130,7 @@ static xed_bool_t
 xed_decoded_inst_dump_att_format_internal(
     xed_print_info_t* pi)
 {
-    int i,j,intel_way, noperands;
+    xed_uint_t i,j,intel_way, noperands;
     const int leading_zeros=0;
     const xed_inst_t* xi = xed_decoded_inst_inst(pi->p);
     const xed_operand_values_t* ov = xed_decoded_inst_operands_const(pi->p);  
@@ -1259,13 +1276,22 @@ xed_decoded_inst_dump_att_format_internal(
               if (xed_operand_values_has_memory_displacement(ov))
               {
                   if (disp_bits && disp) {
-                      if (disp<0) {
-                          if ( (base != XED_REG_INVALID) ||
-                               (index != XED_REG_INVALID) ) {
+                      xed_uint_t no_base_index = (base == XED_REG_INVALID) &&
+                                                 (index == XED_REG_INVALID);
+                      xed_uint_t negative = (disp < 0) ? 1 : 0;
+
+                      if (negative)
+                      {
+                          if (no_base_index)  {
+                              if (xed_operand_values_get_effective_address_width(ov) == 64)
+                                  disp_bits = 64;
+                          }
+                          else  {
                               xed_pi_strcat(pi,"-");                      
                               disp = - disp;
                           }
                       }
+                      
                       xed_pi_strcat(pi,"0x");
                       pi->blen =
                           xed_itoa_hex_ul(pi->buf+xed_strlen(pi->buf),

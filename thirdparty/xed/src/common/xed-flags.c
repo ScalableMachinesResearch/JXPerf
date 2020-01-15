@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ END_LEGAL */
 #include "xed-portability.h"
 #include "xed-util.h"
 #include "xed-tables-extern.h"
-#include <string.h> //memset
 
 xed_bool_t 
 xed_flag_set_is_subset_of(const xed_flag_set_t* p, const xed_flag_set_t* other)

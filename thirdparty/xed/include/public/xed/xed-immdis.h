@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ typedef struct xed_immdis_s {
 
 
 
-XED_DLL_EXPORT void xed_immdis_init(xed_immdis_t* p, int max_bytes);
+XED_DLL_EXPORT void xed_immdis_init(xed_immdis_t* p, xed_uint_t max_bytes);
 
 /// @name Sizes and lengths
 //@{

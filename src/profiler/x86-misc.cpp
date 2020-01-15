@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <ucontext.h>
 
+extern "C" {
+#include "xed/xed-interface.h"
+// #include "xed/xed-common-hdrs.h"
+// #include "xed/xed-agen.h"
+}
 #include "x86-misc.h"
 #include "debug.h"
 
@@ -155,8 +160,7 @@ unsigned int get_float_operation_length(void *ip, uint8_t op_idx) {
 	if(XED_ERROR_NONE != decode(&xedd, ip)) {
 		return 0;
 	}
-    xed_operand_element_xtype_enum_t xx_type;
-	xed_operand_element_type_enum_t op_type = xed_decoded_inst_operand_element_type(&xedd, op_idx, &xx_type);
+	xed_operand_element_type_enum_t op_type = xed_decoded_inst_operand_element_type(&xedd, op_idx);
 	switch(op_type) {
 	case XED_OPERAND_ELEMENT_TYPE_FLOAT16: return 2;
 	case XED_OPERAND_ELEMENT_TYPE_SINGLE: return 4;
@@ -225,7 +229,7 @@ bool INS_IsMethodOrSysCall(void *ip) {
 }
 
 // if return a non-zero value, this ip is write only to the memory
-bool get_mem_access_length_and_type_address(void *ip, uint32_t *accessLen, AccessType *accessType, FloatType * floatType, void * context, void** address, xed_operand_element_xtype_enum_t* xx_type)
+bool get_mem_access_length_and_type_address(void *ip, uint32_t *accessLen, AccessType *accessType, FloatType * floatType, void * context, void** address)
 {
 	xed_decoded_inst_t xedd;
 	if(XED_ERROR_NONE != decode(&xedd, ip)) {
@@ -281,7 +285,7 @@ bool get_mem_access_length_and_type_address(void *ip, uint32_t *accessLen, Acces
 				goto SkipTypeDetection;
 			}
 			// TODO: case XED_OPERAND_MEM1:
-			xed_operand_element_type_enum_t eType = xed_decoded_inst_operand_element_type(&xedd,memOpIdx, xx_type);
+			xed_operand_element_type_enum_t eType = xed_decoded_inst_operand_element_type(&xedd,memOpIdx);
 			switch (eType) {
 			case XED_OPERAND_ELEMENT_TYPE_FLOAT16:
 				*floatType = ELEM_TYPE_FLOAT16;
@@ -332,7 +336,7 @@ SkipTypeDetection:
 }
 
 bool get_mem_access_length_and_type(void * ip, uint32_t *accessLen, AccessType *accessType) {
-	return get_mem_access_length_and_type_address(ip, accessLen, accessType, 0, /*nofloat type */ 0 /* context */, 0 /* address */, 0);
+	return get_mem_access_length_and_type_address(ip, accessLen, accessType, 0, /*nofloat type */ 0 /* context */, 0 /* address */);
 }
 
 void *get_previous_instruction(const void *method_start_addr, const void *method_end_addr, const void *ins, void *excludeList[], int numExcludes) {

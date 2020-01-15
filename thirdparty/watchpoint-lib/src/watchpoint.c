@@ -163,15 +163,7 @@ static void OnWatchPoint(int signum, siginfo_t *info, void *uCtxt) {
         .pcPrecise = 0,
         .sampleAccessLen = wpi->sampleAccessLen,
         .sampleValue = &(wpi->sampleValue[0]),
-        .metric_id1 = wpi->metric_id1,
-
-        .data = wpi->userData,
-        .onsample_type = wpi->onsample_type,
-        .value_vechead = wpi->value_vechead,
-        .type_vechead = wpi->type_vechead,
-        .allocateCtxt = wpi->allocateCtxt,
-        .metric_id2 = wpi->metric_id2,
-        .metric_id3 = wpi->metric_id3
+        .metric_id1 = wpi->metric_id1
     };
    
     if (wpConfig.isLBREnabled == false) {
@@ -225,7 +217,7 @@ static void OnWatchPoint(int signum, siginfo_t *info, void *uCtxt) {
     return;
 }
 
-static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t watchType, void *va, int accessLen, void *watchCtxt, bool modify, int onsample_type, void *value_vechead, int type_vechead, void *allocateCtxt, int metric_id1, int metric_id2, int metric_id3) {
+static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t watchType, void *va, int accessLen, void *watchCtxt, int metric_id1, bool modify) {
     // Perf event settings
     struct perf_event_attr pe;
     memset(&pe, 0, sizeof(struct perf_event_attr));
@@ -310,24 +302,16 @@ static void CreateWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t w
     wpi->watchCtxt = watchCtxt;
     wpi->metric_id1 = metric_id1;
     wpi->startTime = rdtsc();
-
-    wpi->userData = va;
-    wpi->onsample_type = onsample_type;
-    wpi->value_vechead = value_vechead;
-    wpi->type_vechead = type_vechead;
-    wpi->allocateCtxt = allocateCtxt;
-    wpi->metric_id2 = metric_id2;
-    wpi->metric_id3 = metric_id3;
 }
 
 
-static bool ArmWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t watchType, void *va, int accessLen, void *watchCtxt, int onsample_type, void *value_vechead, int type_vechead, void *allocateCtxt, int metric_id1, int metric_id2, int metric_id3) {
+static bool ArmWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t watchType, void *va, int accessLen, void *watchCtxt, int metric_id1) {
     // if WP modification is suppoted use it
     if(wpConfig.isWPModifyEnabled) {
         // Does not matter whether it was active or not.
         // If it was not active, enable it.
         if(wpi->fileHandle != -1) {
-            CreateWatchPoint(wpi, watchLen, watchType, va, accessLen, watchCtxt, true, onsample_type, value_vechead, type_vechead, allocateCtxt, metric_id1, metric_id2, metric_id3);
+            CreateWatchPoint(wpi, watchLen, watchType, va, accessLen, watchCtxt, metric_id1, true);
             return true;
         }
     }
@@ -336,7 +320,7 @@ static bool ArmWatchPoint(WP_RegisterInfo_t *wpi, int watchLen, WP_Access_t watc
     if(wpi->isActive) {
         DisArm(wpi);
     }
-    CreateWatchPoint(wpi, watchLen, watchType, va, accessLen, watchCtxt, false, onsample_type, value_vechead, type_vechead, allocateCtxt, metric_id1, metric_id2, metric_id3);
+    CreateWatchPoint(wpi, watchLen, watchType, va, accessLen, watchCtxt, metric_id1, false);
     return true;
 }
 
@@ -608,7 +592,7 @@ void WP_ThreadTerminate(){
         CloseDummyHardwareEvent(tData.lbrDummyFD);
         tData.lbrDummyFD = -1;
     }*/
-    tData->fs_reg_val= (void*)-1;
+    tData->fs_reg_val = (void*)-1;
     tData->gs_reg_val = (void*)-1;
     
     tData->ss.ss_flags = SS_DISABLE;
@@ -621,7 +605,7 @@ void WP_ThreadTerminate(){
     free(tData);
 }
 
-bool WP_Subscribe(void *va, int watchLen, WP_Access_t watchType, int accessLen,  void *watchCtxt, bool isCaptureValue, bool flag, int onsample_type, void *value_vechead, int type_vechead, void *allocateCtxt, int metric_id1, int metric_id2, int metric_id3) {
+bool WP_Subscribe(void *va, int watchLen, WP_Access_t watchType, int accessLen,  void *watchCtxt, int metric_id1, bool isCaptureValue) {
     if(ValidateWPData(va, watchLen) == false) {
         return false;
     }
@@ -634,35 +618,18 @@ bool WP_Subscribe(void *va, int watchLen, WP_Access_t watchType, int accessLen, 
     // Find a slot to install WP
     WP_Victim_t r = GetVictim(&victimLocation, wpConfig.replacementPolicy);
     if(r != WP_VICTIM_NONE_AVAILABLE) {
-        if(!flag) {
-            if (isCaptureValue) {
-                CaptureValue(va, &(tData->watchPointArray[victimLocation].sampleValue[0]), watchLen);
-            }
-            if(ArmWatchPoint(&(tData->watchPointArray[victimLocation]), watchLen, watchType, va, accessLen, watchCtxt, onsample_type, value_vechead, type_vechead, allocateCtxt, metric_id1, metric_id2, metric_id3) == false) {
-                EMSG("ArmWatchPoint failed for address %p", va);
-                return false;
-            }
-            return true;
+        if (isCaptureValue) {
+            CaptureValue(va, &(tData->watchPointArray[victimLocation].sampleValue[0]), watchLen);
         }
-        else {
-            tData->watchPointArray[victimLocation].userData = va;
-            tData->watchPointArray[victimLocation].onsample_type = onsample_type;
-            tData->watchPointArray[victimLocation].value_vechead = value_vechead;
-            tData->watchPointArray[victimLocation].type_vechead = type_vechead;
-            tData->watchPointArray[victimLocation].allocateCtxt = allocateCtxt;
-            tData->watchPointArray[victimLocation].metric_id2 = metric_id2;
-            tData->watchPointArray[victimLocation].metric_id3 = metric_id3;
-
-            if(ArmWatchPoint(&(tData->watchPointArray[victimLocation]), watchLen, watchType, va, accessLen, watchCtxt, onsample_type, value_vechead, type_vechead, allocateCtxt, metric_id1, metric_id2, metric_id3) == false){
-                //LOG to hpcrun log
-                EMSG("ArmWatchPoint failed for address %p", va);
-                return false;
-            }
-            return true;
+        if(ArmWatchPoint(&(tData->watchPointArray[victimLocation]), watchLen, watchType, va, accessLen, watchCtxt, metric_id1) == false) {
+            EMSG("ArmWatchPoint failed for address %p", va);
+            return false;
         }
+        return true;
     }
     return false;
 }
+
 
 void WP_SetPerfPauseAndResumeFunctions(WP_PerfCallback_t pause_fn,  WP_PerfCallback_t resume_fn){
     wpConfig.userPerfPause = pause_fn;

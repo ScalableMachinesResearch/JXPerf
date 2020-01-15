@@ -2,7 +2,7 @@
 # -*- python -*-
 #BEGIN_LEGAL
 #
-#Copyright (c) 2018 Intel Corporation
+#Copyright (c) 2019 Intel Corporation
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ def _grab_ldd_libraries(lines):
     return (okay, files)
 
 def _file_to_avoid(env,x):
-    avoid_libraries = [ 'ld-linux', 'linux-vdso']
+    avoid_libraries = [ 'ld-linux', 'linux-vdso', 'linux-gate']
     if 'copy_libc' in env:
         if env['copy_libc']==False:
             avoid_libraries.append('libc')

@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ END_LEGAL */
 #include "xed-operand-accessors.h"
 
 #include <stdio.h>  //fprint, stderr
-#include <string.h> //memset
 
 #if defined(__linux__) && defined(__STDC_HOSTED__) && __STDC_HOSTED__ == 0
    extern void abort (void)  __attribute__ ((__noreturn__));
@@ -95,6 +94,11 @@ void xed_operand_values_set_mode(xed_operand_values_t* p,
         xed3_operand_set_realmode(p,1);
         xed3_operand_set_mode(p,0);
         break;
+        
+      case XED_MACHINE_MODE_REAL_32:
+        xed3_operand_set_realmode(p,1);
+        xed3_operand_set_mode(p,1);
+        break;
 
       case XED_MACHINE_MODE_LEGACY_16:
       case XED_MACHINE_MODE_LONG_COMPAT_16:
@@ -116,12 +120,19 @@ void xed_operand_values_set_mode(xed_operand_values_t* p,
         break;
     }
 }
+static XED_INLINE void zero_inst(xed_decoded_inst_t* p)
+{
+    unsigned int i;
+    xed_uint32_t* xp = (xed_uint32_t*)p;
+    for(i=0;i<sizeof(xed_decoded_inst_t)/4;i++)
+        xp[i]=0;
+}
 
 XED_DLL_EXPORT void
 xed_decoded_inst_zero_set_mode(xed_decoded_inst_t* p,
                                const xed_state_t* dstate)
 {
-    memset(p, 0, sizeof(xed_decoded_inst_t));
+    zero_inst(p);
     xed_operand_values_set_mode(p,dstate);
 }
 

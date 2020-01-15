@@ -25,7 +25,7 @@ typedef struct {
 
 } perf_sample_data_t;
 
-typedef void (*sample_cb_t)(int,perf_sample_data_t *, void *, int, int, int);
+typedef void (*sample_cb_t)(int,perf_sample_data_t *, void *, int, int);
 
 
 class PerfManager {

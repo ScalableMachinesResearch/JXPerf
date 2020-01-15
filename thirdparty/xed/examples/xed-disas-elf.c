@@ -1,6 +1,6 @@
 /*BEGIN_LEGAL 
 
-Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -288,7 +288,7 @@ disas_test64(xed_disas_info_t* fi,
 	     void* start,
              unsigned int length,
 	     Elf64_Off offset,
-	     Elf64_Word size,
+	     Elf64_Xword size,
              Elf64_Addr runtime_vaddr,
              xed_symbol_table_t* symbol_table)
 {
@@ -349,8 +349,8 @@ process_elf32(xed_disas_info_t* fi,
     Elf32_Off shoff = elf_hdr->e_shoff;  // section hdr table offset
     Elf32_Shdr* shp = (Elf32_Shdr*) ((char*)start + shoff);
     int sect_strings  = elf_hdr->e_shstrndx;
-    int nsect = elf_hdr->e_shnum;
-    int i;
+    xed_uint_t nsect = elf_hdr->e_shnum;
+    xed_uint_t i;
     unsigned char* hard_limit = (unsigned char*)start + length;
 
     if ((void*)shp < start)
@@ -377,7 +377,7 @@ process_elf32(xed_disas_info_t* fi,
                 text = 1;
         }
 
-        if (text) {
+        if (text && name) {
             if (fi->xml_format == 0) {
                 printf("# SECTION " XED_FMT_D " ", i);
                 printf("%25s ", name);
@@ -467,7 +467,7 @@ process_elf64(xed_disas_info_t* fi,
                 text = 1;
         }
 
-        if (text) {
+        if (text && name) {
             if (fi->xml_format == 0) {
                 printf("# SECTION " XED_FMT_U " ", i);
                 printf("%25s ", name);
@@ -490,7 +490,7 @@ process_elf64(xed_disas_info_t* fi,
 void read_symbols64(void* start,
                     unsigned int len,
                     Elf64_Off offset,
-                    Elf64_Word size,
+                    Elf64_Xword size,
                     Elf64_Off string_table_offset,
                     xed_symbol_table_t* symtab)
 {
