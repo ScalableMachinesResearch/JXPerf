@@ -12,22 +12,22 @@
 
 4. To run dead store detection
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=DeadStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
+  b. python $JXPerf_HOME/script/process_raw_data.py
     1) A dump file named "agent-data" would be generated
 
 5. To run silent store detection
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
+  b. python $JXPerf_HOME/script/process_raw_data.py
     1) A dump file named "agent-data" would be generated
 
 6. To run silent load detection
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -agentpath:$JXPerf_HOME/build/libagent.so=SilentLoad::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
+  b. python $JXPerf_HOME/script/process_raw_data.py
     1) A dump file named "agent-data" would be generated
 
 7. To run data centric analysis
   a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -XX:+UseConcMarkSweepGC -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=DataCentric::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $JXPerf_HOME/process_raw_data.py
+  b. python $JXPerf_HOME/script/process_raw_data.py
     1) A dump file named "agent-data" would be generated, which includes two metrics: "Allocation Times" and "L1 Cache Misses"
       a) The metric "Allocation Times" reports allocation times for every object, which is represented with the object allocation site
       b) The metric "L1 Cache Misses" reports a pair of calling context (i.e., <allocation site, access site>) for every object incurring L1 cache misses
