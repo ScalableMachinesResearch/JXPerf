@@ -12,5 +12,5 @@
 
 4. To run object-level redundancy detection
   a. LD_PRELOAD=$OJXPerf_HOME/build/libpreload.so java -javaagent:$JAVA_AGENT -agentpath:$OJXPerf_HOME/build/libagent.so=OBJLEVEL::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate> -cp <classpath> <java program>
-  b. python $OJXPerf_HOME/process_raw_data.py
+  b. python $OJXPerf_HOME/script/process_raw_data.py
     1) A dump file named "agent-data" would be generated
