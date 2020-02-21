@@ -155,9 +155,10 @@ void CompiledMethod::loadAddrLocationMap(const jvmtiAddrLocationMap* map, jint m
   end_addr = (uint64_t)map[0].start_address - 1;
   assert(start_addr <= end_addr);
   //if (start_addr <= end_addr) {
-    assert(_bci2line_rangeset.getData(map[0].location, lineno));
+    if(_bci2line_rangeset.getData(map[0].location, lineno) == 0)
+        return;
     _addr2line_rangeset.insert(start_addr, end_addr, lineno); 
-  // }
+   //}
   
   // NOTE: map[0].start_address > _start_addr. Therefore, there is some code can't be mapped.
   for(int i = 0; i < map_length - 1; i++) {
