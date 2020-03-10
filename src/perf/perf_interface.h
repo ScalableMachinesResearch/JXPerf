@@ -16,6 +16,7 @@ typedef struct {
   uint64_t ip;
   uint32_t pid, tid;
   uint64_t addr;
+  uint32_t cpu;
   // uint64_t nr;
   // uint64_t ips[PERF_MAX_STACK_DEPTH];
 

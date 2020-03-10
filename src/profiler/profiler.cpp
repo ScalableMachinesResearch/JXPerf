@@ -100,6 +100,8 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
 void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metric_id1, int metric_id2) {
     if (!sampleData->isPrecise || !sampleData->addr) return;
     
+    printf("!cpu number is: %I32u\n", sampleData->cpu);
+
     void *sampleIP = (void *)(sampleData->ip);
     void *sampleAddr = (void *)(sampleData->addr); 
     
