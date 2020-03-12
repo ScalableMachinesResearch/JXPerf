@@ -117,7 +117,6 @@ bool perf_read_record_sample(perf_mmap_t *mmap_buf, uint64_t sample_type, perf_s
     }
     if (sample_type & PERF_SAMPLE_CPU) {
         COPY_SAMPLE_DATA(cpu, 4);
-        //printf("cpu number is: %I32u\n", sample_data->cpu);
     }
 
 #if 0

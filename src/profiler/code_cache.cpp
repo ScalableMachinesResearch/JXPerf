@@ -172,7 +172,8 @@ void CompiledMethod::loadAddrLocationMap(const jvmtiAddrLocationMap* map, jint m
     
     // assert(_bci2line_rangeset.getData(map[i].location, lineno));
     // off-by-1 line NO.
-    assert(_bci2line_rangeset.getData(map[i + 1].location, lineno));
+    if (_bci2line_rangeset.getData(map[i + 1].location, lineno) == 0)
+      return;
     _addr2line_rangeset.insert(start_addr, end_addr, lineno); 
   }
   /*

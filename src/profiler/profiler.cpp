@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iomanip> 
 #include <stack>
+#include <numa.h>
 
 #include "config.h"
 #include "context.h"
@@ -99,15 +100,9 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
 
 void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metric_id1, int metric_id2) {
     if (!sampleData->isPrecise || !sampleData->addr) return;
-    
-    printf("!cpu number is: %I32u\n", sampleData->cpu);
 
     void *sampleIP = (void *)(sampleData->ip);
     void *sampleAddr = (void *)(sampleData->addr); 
-    
-    if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
-        if (!IsValidAddress(sampleIP, sampleAddr)) return;
-    }
 
     jmethodID method_id = 0;
     uint32_t method_version = 0;
@@ -117,6 +112,18 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     if (method == nullptr) return;
     
     uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(metric_id1))->threshold;
+
+    //numa
+    int status[1];
+    int ret_code;
+    status[0] = -1; 
+    ret_code = numa_move_pages(0, 1, &sampleAddr, NULL, status, 0);
+    printf("\nsampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %d\n", sampleData->cpu, sampleData->cpu%4, sampleAddr, status[0]);
+     
+
+    if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
+        if (!IsValidAddress(sampleIP, sampleAddr)) return;
+    }
 
     // data-centric analysis
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
@@ -136,7 +143,7 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
 
 #ifdef PRINT_PMU_INS
     std::ofstream *pmu_ins_output_stream = reinterpret_cast<std::ofstream *>(TD_GET(pmu_ins_output_stream));
-    assert(pmu_ins_output_stream != nullptr);
+    assert(pmu_ins_output_stream != nullptr); 
     print_single_instruction(pmu_ins_output_stream, (const void *)sampleIP);
 #endif
     
