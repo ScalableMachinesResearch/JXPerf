@@ -120,13 +120,13 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(metric_id1))->threshold;
 
     //numa
-    /*
+    
     int status[1];
     int ret_code;
     status[0] = -1; 
     ret_code = numa_move_pages(0, 1, &sampleAddr, NULL, status, 0);
     printf("\nsampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %d\n", sampleData->cpu, sampleData->cpu%4, sampleAddr, status[0]);
-    */
+    
 
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
         if (!IsValidAddress(sampleIP, sampleAddr)) return;
