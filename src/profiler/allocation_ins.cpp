@@ -41,9 +41,10 @@ namespace {
         last_ctxt->setMetrics(metrics);
     }
     metrics::metric_val_t metric_val;
-    metric_val.i = 1;
+    uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(0))->threshold;
+    metric_val.i = threshold;
     assert(metrics->increment(0, metric_val)); // id = 0: allocation times
-    totalAllocTimes += 1;
+    totalAllocTimes += threshold;
 
     return last_ctxt;
 }
