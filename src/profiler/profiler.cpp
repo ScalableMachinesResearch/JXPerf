@@ -43,8 +43,11 @@ uint64_t grandTotDeadBytes = 0;
 uint64_t grandTotNewBytes = 0;
 uint64_t grandTotOldBytes = 0;
 uint64_t grandTotOldAppxBytes = 0;
-uint64_t grandTotL1Cachemiss = 0;
 uint64_t grandTotAllocTimes = 0;
+uint64_t grandTotSameNUMA = 0;
+uint64_t grandTotDiffNUMA = 0;
+//uint64_t grandTotL1Cachemiss = 0;
+
 
 thread_local uint64_t totalWrittenBytes = 0;
 thread_local uint64_t totalLoadedBytes = 0;
@@ -53,8 +56,11 @@ thread_local uint64_t totalDeadBytes = 0;
 thread_local uint64_t totalNewBytes = 0;
 thread_local uint64_t totalOldBytes = 0;
 thread_local uint64_t totalOldAppxBytes = 0;
-thread_local uint64_t totalL1Cachemiss = 0;
 thread_local uint64_t totalAllocTimes = 0;
+thread_local uint64_t totalSameNUMA = 0;
+thread_local uint64_t totalDiffNUMA = 0;
+//thread_local uint64_t totalL1Cachemiss = 0;
+
 
 thread_local void *prevIP = (void *)0;
 
@@ -98,7 +104,7 @@ Context *constructContext(ASGCT_FN asgct, void *uCtxt, uint64_t ip, Context *ctx
 }
 
 
-void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metric_id1, int metric_id2) {
+void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt, int metric_id1, int metric_id2, int metric_id3) {
     if (!sampleData->isPrecise || !sampleData->addr) return;
 
     void *sampleIP = (void *)(sampleData->ip);
@@ -114,12 +120,13 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(metric_id1))->threshold;
 
     //numa
+    /*
     int status[1];
     int ret_code;
     status[0] = -1; 
     ret_code = numa_move_pages(0, 1, &sampleAddr, NULL, status, 0);
     printf("\nsampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %d\n", sampleData->cpu, sampleData->cpu%4, sampleAddr, status[0]);
-     
+    */
 
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
         if (!IsValidAddress(sampleIP, sampleAddr)) return;
@@ -127,7 +134,7 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
 
     // data-centric analysis
     if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
-        DataCentricAnalysis(sampleData, uCtxt, method_id, method_version, threshold, metric_id2);
+        DataCentricAnalysis(sampleData, uCtxt, method_id, method_version, threshold, metric_id2, metric_id3);
         return;
     }
 
@@ -189,7 +196,7 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     }
 }
 
-void Profiler::DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2) {
+void Profiler::DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2, int metric_id3) {
 	void* startaddress;
 	tree_lock.lock();
 	interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void *)(sampleData->addr), &startaddress);
@@ -230,7 +237,8 @@ void Profiler::DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, 
 			metrics::metric_val_t metric_val;
 			metric_val.i = threshold;
 			assert(metrics->increment(metric_id2, metric_val));
-			totalL1Cachemiss += threshold;
+            totalSameNUMA += threshold;
+			//totalL1Cachemiss += threshold;
 		}
 	} else {
 		Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
@@ -248,7 +256,8 @@ void Profiler::DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, 
 				metrics::metric_val_t metric_val;
 				metric_val.i = threshold;
 				assert(metrics->increment(metric_id2, metric_val));
-				totalL1Cachemiss += threshold;
+                totalDiffNUMA += threshold;
+				//totalL1Cachemiss += threshold;
 			}
 		}
 	}
@@ -614,8 +623,10 @@ void Profiler::threadStart() {
     totalNewBytes = 0;
     totalOldBytes = 0;
     totalOldAppxBytes = 0;
-    totalL1Cachemiss = 0;
     totalAllocTimes = 0;
+    totalSameNUMA = 0;
+    totalDiffNUMA = 0;
+    //totalL1Cachemiss = 0;
 
     ThreadData::thread_data_alloc();
     ContextTree *ct_tree = new(std::nothrow) ContextTree();
@@ -726,8 +737,10 @@ void Profiler::threadEnd() {
     __sync_fetch_and_add(&grandTotNewBytes, totalNewBytes);
     __sync_fetch_and_add(&grandTotOldBytes, totalOldBytes);
     __sync_fetch_and_add(&grandTotOldAppxBytes, totalOldAppxBytes);
-    __sync_fetch_and_add(&grandTotL1Cachemiss, totalL1Cachemiss);
     __sync_fetch_and_add(&grandTotAllocTimes, totalAllocTimes);
+    __sync_fetch_and_add(&grandTotSameNUMA, totalSameNUMA);
+    __sync_fetch_and_add(&grandTotDiffNUMA, totalDiffNUMA);
+    //__sync_fetch_and_add(&grandTotL1Cachemiss, totalL1Cachemiss);
 }
 
 
@@ -756,6 +769,8 @@ void Profiler::output_statistics() {
     } else if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
         _statistics_file << clientName << std::endl;
         _statistics_file << grandTotAllocTimes << std::endl;
-        _statistics_file << grandTotL1Cachemiss << std::endl;
+        _statistics_file << grandTotSameNUMA << std::endl;
+        _statistics_file << grandTotDiffNUMA << std::endl;
+        //_statistics_file << grandTotL1Cachemiss << std::endl;
     }
 }
