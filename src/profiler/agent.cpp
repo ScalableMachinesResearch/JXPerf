@@ -65,7 +65,7 @@ static void JNICALL callbackVMInit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
   }
   std::string client_name = GetClientName();
 
-  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0 || client_name.compare(NUMANODE_CLIENT_NAME) == 0) {
     jclass myClass = NULL;
     jmethodID main = NULL;
     jmethodID main_gc = NULL;
