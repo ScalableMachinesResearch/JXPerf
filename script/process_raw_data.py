@@ -309,10 +309,10 @@ def main():
 		rows = sorted(dump_data.items(), key=lambda x: x[-1], reverse = True)
 
 		for row in rows:
-			equalityTimes = row[-1]
-			inequalityTimes = 0
+			inequalityTimes = row[-1]
+			equalityTimes = 0
 			if dump_data2.has_key(row[0]):
-				inequalityTimes = dump_data2[row[0]]	
+				equalityTimes = dump_data2[row[0]]	
 			file.write(row[0] + "\n\nFraction of Mismatch: " + str(round(float(inequalityTimes) * 100 / totalInequalityMismatches, 2)) + "%;" + " Match Times: " + str(equalityTimes) + " Mismatch Times: " + str(inequalityTimes) + " Match Percentage: " + str(round(float(equalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%;" + " Mismatch Percentage: " + str(round(float(inequalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%\n")
 		file.write("\nTotal Match Times: " + result[0])
 		file.write("\nTotal Mismatch Times: " + result[1])

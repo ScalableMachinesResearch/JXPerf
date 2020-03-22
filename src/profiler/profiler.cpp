@@ -253,11 +253,11 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
 			metric_val.i = threshold;
             
             if (object_numa_node == sampling_numa_node) {
+			    assert(metrics->increment(metric_id3, metric_val));
                 totalSameNUMA += threshold;
-			    assert(metrics->increment(metric_id2, metric_val));
             } else {
+                assert(metrics->increment(metric_id2, metric_val));
                 totalDiffNUMA += threshold;
-                assert(metrics->increment(metric_id3, metric_val));
             }
 
 		}
@@ -278,11 +278,11 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
 				metric_val.i = threshold;
 
                 if (object_numa_node == sampling_numa_node) {
+			        assert(metrics->increment(metric_id3, metric_val));
                     totalSameNUMA += threshold;
-			        assert(metrics->increment(metric_id2, metric_val));
                 } else {
+                    assert(metrics->increment(metric_id2, metric_val));
                     totalDiffNUMA += threshold;
-                    assert(metrics->increment(metric_id3, metric_val));
                 }
 
 			}
@@ -770,7 +770,7 @@ void Profiler::threadEnd() {
     for (auto elem : (*ctxt_tree)) {
         Context *ctxt_ptr = elem;
 
-	jmethodID method_id = ctxt_ptr->getFrame().method_id;
+	    jmethodID method_id = ctxt_ptr->getFrame().method_id;
         _code_cache_manager.checkAndMoveMethodToUncompiledSet(method_id);
     
         if (ctxt_ptr->getMetrics() != nullptr && dump_ctxt.find(ctxt_ptr) == dump_ctxt.end()) { // leaf node of the redundancy pair
