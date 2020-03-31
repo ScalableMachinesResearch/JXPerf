@@ -11,7 +11,7 @@
   a. make clean
 
 4. To run numa node mismatch analysis
-  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -XX:+UseConcMarkSweepGC -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=NUMA::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate> -cp <classpath> <java program>
+  a. LD_PRELOAD=$JXPerf_HOME/build/libpreload.so java -javaagent:$JAVA_AGENT -agentpath:$JXPerf_HOME/build/libagent.so=NUMA::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate> -cp <classpath> <java program>
   b. python $JXPerf_HOME/script/process_raw_data.py
     1) A dump file named "agent-data" would be generated
     2) "Fraction of Mismatch": mismatch times of one object over the total mismatch times of whole program
