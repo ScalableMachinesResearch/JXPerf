@@ -27,7 +27,7 @@ namespace {
         if (last_ctxt == nullptr) last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
         else last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);
     }
-    	
+
     ContextFrame ctxt_frame;
     ctxt_frame.bci = -65536;
     if (last_ctxt == nullptr)
@@ -35,6 +35,7 @@ namespace {
     else
         last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);       
     
+
     if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
         metrics::ContextMetrics *metrics = last_ctxt->getMetrics();
         if (metrics == nullptr) {

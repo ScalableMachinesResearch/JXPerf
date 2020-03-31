@@ -45,6 +45,7 @@ public:
   inline bool isTriggered() {return _triggered;}
   inline void setTriggered() {_triggered = true;}
 
+
 private:
   Context(uint32_t id);
   ~Context();

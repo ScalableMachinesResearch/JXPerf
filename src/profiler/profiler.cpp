@@ -201,7 +201,7 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
     ret_code = numa_move_pages(0, 1, &sampleAddr, NULL, status, 0);
     if (ret_code == -1)
         return;
-    //printf("\n3/17sampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %d\n", sampleData->cpu, sampleData->cpu%4, sampleAddr, status[0]);
+    
     uint32_t object_numa_node = (uint32_t)status[0];
     uint32_t sampling_numa_node = sampleData->cpu % 4;
      
@@ -210,22 +210,25 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
 	interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void *)(sampleData->addr), &startaddress);
 	tree_lock.unlock();
 
-    /*
+#if 0
     if (object_numa_node == sampling_numa_node)
-        printf("\nEqual! sampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %lu\n", sampling_numa_node, sampleData->cpu%4, sampleAddr, object_numa_node);
+        printf("\nEqual! sampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %lu\n", sampleData->cpu, sampling_numa_node, sampleAddr, object_numa_node);
     else
-        printf("\nNot equal! sampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %lu\n", sampling_numa_node, sampleData->cpu%4, sampleAddr, object_numa_node);
-    */
+        printf("\nNot equal! sampling at cpu#: %lu (Reside numa node: %lu); Object Memory at %p is at numa node %lu\n", sampleData->cpu, sampling_numa_node, sampleAddr, object_numa_node);
+#endif
 
 	if (p != NULL) {
 		// assert(p->node_ctxt != nullptr);
-		Context *ctxt = p->node_ctxt; 
+        Context *ctxt = p->node_ctxt; 
 		std::stack<Context *> ctxt_stack;
-		while (ctxt != nullptr) {
+		
+        while (ctxt != nullptr) {
 			ctxt_stack.push(ctxt);
-		ctxt = ctxt->getParent();
+            ctxt = ctxt->getParent();
+            //ctxt = nullptr;
 		}
-
+        
+        #if 1
 		if (!ctxt_stack.empty()) ctxt_stack.pop(); // pop out the root
 		
 		ctxt = nullptr;
@@ -236,7 +239,7 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
 			else ctxt = ctxt_tree->addContext(ctxt, ctxt_frame);
 			ctxt_stack.pop();
 		}
-			
+
 		Context *ctxt_allocate = constructContext(_asgct, uCtxt, sampleData->ip, ctxt, method_id, method_version);
 		Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
 
@@ -261,6 +264,7 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
             }
 
 		}
+        #endif
 	} else {
 		Context *ctxt_access = constructContext(_asgct, uCtxt, sampleData->ip, nullptr, method_id, method_version);
 		lock_map.lock();
@@ -287,7 +291,7 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
 
 			}
 		}
-	} 
+	}
 }
 
 void Profiler::DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2) {

@@ -92,6 +92,7 @@ public class AllocationInstrumenter implements ClassFileTransformer {
   
   static final Unsafe unsafe = getUnsafe();
   static final boolean is64bit = true;
+  static boolean flag = true;
 
   public static String printAddresses(Object... objects) {
         String tmp = "";
@@ -136,18 +137,32 @@ public class AllocationInstrumenter implements ClassFileTransformer {
   }
   
 
-  
   public native void dataCentric(String addr, long size);
   public native void clearTree();
-  //static AllocationInstrumenter ai = new  AllocationInstrumenter();
+  
 
   public static void register_callback(String[] args)
   {
     AllocationInstrumenter ai = new  AllocationInstrumenter();
 
     AllocationRecorder.addSampler(new Sampler() {
+        
         public void sampleAllocation(int count, String desc, Object newObj, long size) {
-            
+            if (flag == true) {
+              List<GarbageCollectorMXBean> gcbeans = java.lang.management.ManagementFactory.getGarbageCollectorMXBeans();
+              for (GarbageCollectorMXBean gcbean : gcbeans) {
+                NotificationEmitter emitter = (NotificationEmitter) gcbean;
+                //System.out.println(gcbean.getName());
+
+                NotificationListener listener = (notification, handback) -> {
+                  if (notification.getType().equals(GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION)) {
+                      ai.clearTree();            
+                  }
+                };
+                emitter.addNotificationListener(listener, null, null);
+              }
+              flag = false;
+            }
             if(size > 1024)
             {
                 try
@@ -161,27 +176,6 @@ public class AllocationInstrumenter implements ClassFileTransformer {
         }
     });
   }
-  
-
-  
-  public static void installGCMonitoring(String[] args) {
-        //System.out.println("install gc monitor");
-        AllocationInstrumenter ai = new  AllocationInstrumenter();
-        
-        List<GarbageCollectorMXBean> gcbeans = java.lang.management.ManagementFactory.getGarbageCollectorMXBeans();
-        for (GarbageCollectorMXBean gcbean : gcbeans) {
-            NotificationEmitter emitter = (NotificationEmitter) gcbean;
-            //System.out.println(gcbean.getName());
-
-            NotificationListener listener = (notification, handback) -> {
-                if (notification.getType().equals(GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION)) {
-                    ai.clearTree();            
-                }
-            };
-
-            emitter.addNotificationListener(listener, null, null);
-        }
-    }
 
 
   public static void premain(String agentArgs, Instrumentation inst) {
