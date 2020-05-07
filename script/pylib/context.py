@@ -5,6 +5,7 @@ class Context:
 		self.id = ctxt_id
 		self.method_version = None
 		self.binary_addr = None
+		self.numa_node = None
 		self.method_id = None
 		self.bci = None
 		self.metrics_type = None

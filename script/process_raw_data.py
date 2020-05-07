@@ -93,6 +93,7 @@ def load_context(context_root):
 		# set fields
 		ctxt.method_version = ctxt_xml.getAttr("method_version")
 		ctxt.binary_addr = ctxt_xml.getAttr("binary_addr")
+		ctxt.numa_node = ctxt_xml.getAttr("numa_node")
 		ctxt.method_id = ctxt_xml.getAttr("method_id")
 		ctxt.bci = ctxt_xml.getAttr("bci")
 		ctxt.setParentID(ctxt_xml.getAttr("parent_id"))
@@ -321,6 +322,6 @@ def main():
 
 	print("Final dumping")
 
-	remove_all_files(".")
+	#remove_all_files(".")
 
 main()

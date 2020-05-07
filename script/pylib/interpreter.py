@@ -14,6 +14,7 @@ class Interpreter:
 		## the source_file and source_lineno should indicate where the method is called.. I mean it is related to the parent
 		
 		ip = context.binary_addr
+		node = context.numa_node
 		if self._context_manager.isRoot(context):
 			class_name, method_name, source_file, source_lineno, ip = "Root", None, None, None, None
 
@@ -54,6 +55,8 @@ class Interpreter:
 			ip = ""
 		else:
 			ip = hex(int(ip))
+		if node == "10":
+			node = ""
 
 
 		if context.bci == "-65536" and isDataCentric:
@@ -64,7 +67,7 @@ class Interpreter:
 			return "*********************************REDUNDANT WITH*********************************"
 		elif class_name == "Root":
 			return ""
-		#elif ip != "":
-			#return ""
+		# elif ip != "":
+			# return ""
 		else:
-			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + ")"
+			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + " " + node + ")"
