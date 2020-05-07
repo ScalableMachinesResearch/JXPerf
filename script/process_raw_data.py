@@ -322,6 +322,6 @@ def main():
 
 	print("Final dumping")
 
-	#remove_all_files(".")
+	remove_all_files(".")
 
 main()
