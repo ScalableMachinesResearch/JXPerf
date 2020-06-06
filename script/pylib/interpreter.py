@@ -9,11 +9,12 @@ class Interpreter:
 		self._method_manager = method_manager
 		self._context_manager = context_manager
 
-	def getSrcPosition(self, context, isDataCentric=False):
+	def getSrcPosition(self, context, isDataCentric=False, isNuma=True):
 		## include [method name], [source file] and [source lineno]
 		## the source_file and source_lineno should indicate where the method is called.. I mean it is related to the parent
 		
 		ip = context.binary_addr
+		node = context.numa_node
 		if self._context_manager.isRoot(context):
 			class_name, method_name, source_file, source_lineno, ip = "Root", None, None, None, None
 
@@ -54,15 +55,19 @@ class Interpreter:
 			ip = ""
 		else:
 			ip = hex(int(ip))
+		if node == "10":
+			node = ""
 
 
 		if context.bci == "-65536" and isDataCentric:
-			return "*********************************USED BY*********************************"
+			return "***********************Access to the object above***********************"
+		elif context.bci == "-65536" and isNuma:
+			return "***********************Access to the object above***********************"
 		elif context.bci == "-65536":
 			return "*********************************REDUNDANT WITH*********************************"
 		elif class_name == "Root":
 			return ""
-		#elif ip != "":
-			#return ""
+		# elif ip != "":
+			# return ""
 		else:
-			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + ")"
+			return class_name + "." + method_name +"(" + source_file +":" + source_lineno + " " + node + ")"

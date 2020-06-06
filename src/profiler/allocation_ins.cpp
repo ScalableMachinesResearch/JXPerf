@@ -6,7 +6,7 @@ extern interval_tree_node *splay_tree_root;
 extern __thread uint64_t totalAllocTimes;
 
 namespace {
-	Context *allocation_constructContext(ASGCT_FN asgct, void *context){
+	Context *allocation_constructContext(ASGCT_FN asgct, void *context, std::string client_name){
     ASGCT_CallTrace trace;
     ASGCT_CallFrame frames[MAX_FRAME_NUM];
     
@@ -27,7 +27,7 @@ namespace {
         if (last_ctxt == nullptr) last_ctxt = ctxt_tree->addContext((uint32_t)CONTEXT_TREE_ROOT_ID, ctxt_frame);
         else last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);
     }
-    	
+
     ContextFrame ctxt_frame;
     ctxt_frame.bci = -65536;
     if (last_ctxt == nullptr)
@@ -35,16 +35,19 @@ namespace {
     else
         last_ctxt = ctxt_tree->addContext(last_ctxt, ctxt_frame);       
     
-    metrics::ContextMetrics *metrics = last_ctxt->getMetrics();
-    if (metrics == nullptr) {
-        metrics = new metrics::ContextMetrics();
-        last_ctxt->setMetrics(metrics);
+
+    if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+        metrics::ContextMetrics *metrics = last_ctxt->getMetrics();
+        if (metrics == nullptr) {
+            metrics = new metrics::ContextMetrics();
+            last_ctxt->setMetrics(metrics);
+        }
+        metrics::metric_val_t metric_val;
+        uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(0))->threshold;
+        metric_val.i = threshold;
+        assert(metrics->increment(0, metric_val)); // id = 0: allocation times
+        totalAllocTimes += threshold;
     }
-    metrics::metric_val_t metric_val;
-    uint32_t threshold = (metrics::MetricInfoManager::getMetricInfo(0))->threshold;
-    metric_val.i = threshold;
-    assert(metrics->increment(0, metric_val)); // id = 0: allocation times
-    totalAllocTimes += threshold;
 
     return last_ctxt;
 }
@@ -78,9 +81,10 @@ Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_dataCe
     uint64_t obj_size = size;
     uint64_t endingAddr = startingAddr + obj_size;
     
+    std::string client_name = GetClientName();
     ucontext_t context, *cp = &context;
     getcontext(cp);
-    Context *ctxt = allocation_constructContext(Profiler::_asgct, (void*)cp);
+    Context *ctxt = allocation_constructContext(Profiler::_asgct, (void*)cp, client_name);
 
 	interval_tree_node *node = SplayTree::node_make((void*)startingAddr, (void*)endingAddr, ctxt);
 

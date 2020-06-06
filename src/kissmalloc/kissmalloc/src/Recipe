@@ -1,0 +1,8 @@
+Library {
+    name: kissmalloc
+    source: [ kissmalloc.c, kissmalloc_new.cc ]
+    Dependency {
+        compile-flags: -DKISSMALLOC_OVERLOAD_LIBC
+        cascade: true
+    }
+}

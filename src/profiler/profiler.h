@@ -37,11 +37,12 @@ public:
   static ASGCT_FN _asgct;
 
 private:
-  static void OnSample(int event_idx, perf_sample_data_t *sample_data, void *context, int metric_id1, int metric_id2);
+  static void OnSample(int event_idx, perf_sample_data_t *sample_data, void *context, int metric_id1, int metric_id2, int metric_id3);
   static WP_TriggerAction_t OnDeadStoreWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnRedStoreWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t OnRedLoadWatchPoint(WP_TriggerInfo_t *wpi);
   static WP_TriggerAction_t DetectRedundancy(WP_TriggerInfo_t *wpi, jmethodID method_id, uint32_t method_version, std::string client_name);
+  static void NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2, int metric_id3);
   static void DataCentricAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2);
   
   inline void output_statistics(); 

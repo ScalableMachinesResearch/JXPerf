@@ -34,6 +34,7 @@ bool perf_attr_init(struct perf_event_attr *attr, uint64_t threshold, uint64_t m
     sample_type |= PERF_SAMPLE_IP;
     sample_type |= PERF_SAMPLE_CALLCHAIN;
     sample_type |= PERF_SAMPLE_ADDR;
+    sample_type |= PERF_SAMPLE_CPU;
 
     attr->sample_type = sample_type;
     attr->size   = sizeof(struct perf_event_attr); /* Size of attribute structure */

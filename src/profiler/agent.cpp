@@ -8,6 +8,8 @@
 #include <string.h>
 #include <assert.h>
 #include <dlfcn.h>
+#include <thread>
+#include <chrono>
 
 #include "thread_data.h"
 #include "agent.h"
@@ -28,7 +30,6 @@ Argument* JVM::_argument = nullptr;
 
 
 void JVM::parseArgs(const char *arg) {
-  assert(_argument == nullptr);
   _argument = new(std::nothrow) Argument(arg);
   assert(_argument);
 }
@@ -65,13 +66,14 @@ static void JNICALL callbackVMInit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
   }
   std::string client_name = GetClientName();
 
-  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0 || client_name.compare(NUMANODE_CLIENT_NAME) == 0) {
     jclass myClass = NULL;
     jmethodID main = NULL;
+    //jmethodID main_gc = NULL;
         
     //Call java agent register_callback
     myClass = jni->FindClass("com/google/monitoring/runtime/instrumentation/AllocationInstrumenter");
-        
+
     main = jni->GetStaticMethodID(myClass, "register_callback", "([Ljava/lang/String;)V");
     jni->CallStaticVoidMethod(myClass, main, " ");
   }
@@ -219,12 +221,30 @@ static void JNICALL callbackClassPrepare(jvmtiEnv* jvmti, JNIEnv* jni, jthread t
     // UNBLOCK_SAMPLE;
 }
 
+void JVM::loadMethodIDs(jvmtiEnv* jvmti, jclass klass) {
+    jint method_count;
+    jmethodID* methods;
+    if (jvmti->GetClassMethods(klass, &method_count, &methods) == 0) {
+        jvmti->Deallocate((unsigned char*)methods);
+    }
+}
+
+void JVM::loadAllMethodIDs(jvmtiEnv* jvmti) {
+    jint class_count;
+    jclass* classes;
+    if (jvmti->GetLoadedClasses(&class_count, &classes) == 0) {
+        for (int i = 0; i < class_count; i++) {
+            loadMethodIDs(jvmti, classes[i]);
+        }
+        jvmti->Deallocate((unsigned char*)classes);
+    }
+}
 
 
 /////////////
 // METHODS //
 /////////////
-bool JVM::init(JavaVM *jvm, const char *arg) {
+bool JVM::init(JavaVM *jvm, const char *arg, bool attach) {
   jvmtiError error;
   jint res;
   jvmtiEventCallbacks callbacks;
@@ -253,7 +273,7 @@ bool JVM::init(JavaVM *jvm, const char *arg) {
   }
 
   /////////////////////
-  // Init capabilities:
+  // Init capabilities:··
   jvmtiCapabilities capa;
   memset(&capa, '\0', sizeof(jvmtiCapabilities));
   //capa.can_signal_thread = 1;
@@ -267,6 +287,14 @@ bool JVM::init(JavaVM *jvm, const char *arg) {
   capa.can_generate_method_entry_events = 1; // This one must be enabled in order to get the stack trace
   //capa.can_generate_native_method_bind_events = 1;
   capa.can_generate_compiled_method_load_events = 1;
+
+    capa.can_generate_all_class_hook_events = 1;
+    capa.can_retransform_classes = 1;
+    capa.can_retransform_any_class = 1;
+    capa.can_get_bytecodes = 1;
+    capa.can_get_constant_pool = 1;
+    capa.can_generate_monitor_events = 1;
+    capa.can_tag_objects = 1;
 
   error = _jvmti->AddCapabilities(&capa);
   check_jvmti_error(error, "Unable to get necessary JVMTI capabilities.");
@@ -331,6 +359,12 @@ bool JVM::init(JavaVM *jvm, const char *arg) {
   check_jvmti_error(error, "Cannot generate CompiledMethodLoad");
 #endif
 
+  if (attach) {
+    loadAllMethodIDs(_jvmti);
+    _jvmti->GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED);
+    _jvmti->GenerateEvents(JVMTI_EVENT_COMPILED_METHOD_LOAD);
+  }
+
   Profiler::getProfiler().init();
 
   return true;
@@ -356,13 +390,32 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
 
   BLOCK_SAMPLE;
   INFO("Agent argument = %s\n", options);
-  if (!JVM::init(jvm, options)) {
+  if (!JVM::init(jvm, options, false)) {
     UNBLOCK_SAMPLE;
     return JNI_ERR;
   }
   INFO("Agent_onLoad\n");
   UNBLOCK_SAMPLE;
   return JNI_OK;
+}
+
+
+/**
+* Agent entry point
+*/
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  BLOCK_SAMPLE;
+  if(options[strlen(options)-1] == 's') {   
+    printf("profiler start\n");
+    options[strlen(options)-1] = '\0';
+    JVM::init(jvm, options, true);
+  }
+  else {
+    printf("profiler end\n");
+    JVM::shutdown();
+  }
+  UNBLOCK_SAMPLE;
+  return 0;
 }
 
 /**

@@ -4,4 +4,6 @@
 module config-cache {
   set "default address-model-32-bit-64-bit-<target-os>linux-<toolset-gcc:version>7-<toolset>gcc" : "2" ;
   set "default architecture-arm-mips1-power-sparc-x86-combined-<target-os>linux-<toolset-gcc:version>7-<toolset>gcc" : "5" ;
+  set "default address-model-32-bit-64-bit-<target-os>linux-<toolset-gcc:version>4.8.5-<toolset>gcc" : "2" ;
+  set "default architecture-arm-mips1-power-sparc-x86-combined-<target-os>linux-<toolset-gcc:version>4.8.5-<toolset>gcc" : "5" ;
 }

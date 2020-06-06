@@ -115,6 +115,9 @@ bool perf_read_record_sample(perf_mmap_t *mmap_buf, uint64_t sample_type, perf_s
         // to be used by datacentric event
         COPY_SAMPLE_DATA(addr, 8);
     }
+    if (sample_type & PERF_SAMPLE_CPU) {
+        COPY_SAMPLE_DATA(cpu, 4);
+    }
 
 #if 0
     uint32_t data_read = 0; //currently, we don't need this value

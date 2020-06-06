@@ -356,6 +356,7 @@
           <archive>
             <manifestEntries>
               <Premain-Class>com.google.monitoring.runtime.instrumentation.AllocationInstrumenterBootstrap</Premain-Class>
+              <Agent-Class>com.google.monitoring.runtime.instrumentation.AllocationInstrumenter</Agent-Class>
               <Can-Redefine-Classes>true</Can-Redefine-Classes>
               <Can-Retransform-Classes>true</Can-Retransform-Classes>
               <Main-Class>NotSuitableAsMain</Main-Class>

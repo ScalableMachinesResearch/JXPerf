@@ -16,6 +16,7 @@ typedef struct {
   uint64_t ip;
   uint32_t pid, tid;
   uint64_t addr;
+  uint32_t cpu;
   // uint64_t nr;
   // uint64_t ips[PERF_MAX_STACK_DEPTH];
 
@@ -25,7 +26,7 @@ typedef struct {
 
 } perf_sample_data_t;
 
-typedef void (*sample_cb_t)(int,perf_sample_data_t *, void *, int, int);
+typedef void (*sample_cb_t)(int,perf_sample_data_t *, void *, int, int, int);
 
 
 class PerfManager {

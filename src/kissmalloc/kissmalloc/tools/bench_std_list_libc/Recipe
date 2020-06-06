@@ -1,0 +1,4 @@
+Application {
+    name: kissbench_std_list_libc
+    source: *.cc
+}
