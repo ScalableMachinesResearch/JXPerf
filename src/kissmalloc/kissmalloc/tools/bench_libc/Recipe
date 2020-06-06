@@ -1,0 +1,4 @@
+Application {
+    name: kissbench_libc
+    source: *.c
+}

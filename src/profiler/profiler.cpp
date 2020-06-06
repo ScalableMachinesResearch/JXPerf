@@ -5,7 +5,7 @@
 #include <iomanip> 
 #include <stack>
 #include <numa.h>
-
+ 
 #include "config.h"
 #include "context.h"
 #include "profiler.h"
@@ -14,11 +14,11 @@
 #include "stacktraces.h"
 #include "agent.h"
 #include "metrics.h"
-#include "preload.h"
 #include "debug.h"
 #include "x86-misc.h"
 #include "context-pc.h" 
-#include "safe-sampling.h"
+#include "safe-sampling.h" 
+//#include "Memory.h" 
 
 #define APPROX_RATE (0.01)
 #define MAX_FRAME_NUM (128)
@@ -172,7 +172,7 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     metrics::ContextMetrics *metrics = watchCtxt->getMetrics();
     if (metrics == nullptr) {
         metrics = new metrics::ContextMetrics();
-        watchCtxt->setMetrics(metrics);
+        watchCtxt->setMetrics(metrics); 
     }
     metrics::metric_val_t metric_val;
     metric_val.i = threshold;
@@ -197,7 +197,7 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
     }
 }
 
-void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2, int metric_id3) {
+void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, uint32_t threshold, int metric_id2, int metric_id3) { 
     void *sampleAddr = (void *)(sampleData->addr);
     int status[1];
     int ret_code;
@@ -253,7 +253,9 @@ void::Profiler::NumaAnalysis(perf_sample_data_t *sampleData, void *uCtxt, jmetho
 		if (ctxt_allocate != nullptr && sampleData->ip != 0) {
 			metrics::ContextMetrics *metrics = ctxt_allocate->getMetrics();
 			if (metrics == nullptr) {
-				metrics = new metrics::ContextMetrics();
+				//metrics = new metrics::ContextMetrics();
+                metrics = new metrics::ContextMetrics();
+
 				ctxt_allocate->setMetrics(metrics);
 			}
 			metrics::metric_val_t metric_val;
@@ -678,9 +680,8 @@ WP_TriggerAction_t Profiler::OnRedLoadWatchPoint(WP_TriggerInfo_t *wpt) {
 }
 
 
-Profiler::Profiler() {
-    _asgct = (ASGCT_FN)dlsym(RTLD_DEFAULT, "AsyncGetCallTrace");
-    assert(_asgct);
+Profiler::Profiler() { 
+    _asgct = (ASGCT_FN)dlsym(RTLD_DEFAULT, "AsyncGetCallTrace"); 
 }
 
 

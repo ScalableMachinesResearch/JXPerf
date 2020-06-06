@@ -11,11 +11,9 @@ thirdparty:
 	cd thirdparty/bintrees-2.0.7 &&  python setup.py install --user
 	cd thirdparty/allocation-instrumenter && mvn package -DskipTests
 	cd src && make 
-	cd preload && make 
 
 clean:
 	make -C src clean
-	make -C preload clean
 	make -C thirdparty/watchpoint-lib clean
 	make -C thirdparty/libpfm-4.10.1 clean
 	cd thirdparty/xed && ./mfile.py clean 

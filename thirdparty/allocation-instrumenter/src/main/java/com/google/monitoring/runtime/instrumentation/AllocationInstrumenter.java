@@ -178,6 +178,54 @@ public class AllocationInstrumenter implements ClassFileTransformer {
   }
 
 
+public static void agentmain(String agentArgs, Instrumentation inst) {
+
+	System.load(System.getenv("JXPerf_HOME") + "/build/libagent.so");
+
+    AllocationRecorder.setInstrumentation(inst);
+
+    // Force eager class loading here.  The instrumenter relies on these classes.  If we load them
+    // for the first time during instrumentation, the instrumenter will try to rewrite them.  But
+    // the instrumenter needs these classes to run, so it will try to load them during that rewrite
+    // pass.  This results in a ClassCircularityError.
+    try {
+      Class.forName("sun.security.provider.PolicyFile");
+      Class.forName("java.util.ResourceBundle");
+      Class.forName("java.util.Date");
+    } catch (Throwable t) {
+      // NOP
+    }
+
+    if (!inst.isRetransformClassesSupported()) {
+      System.err.println("Some JDK classes are already loaded and will not be instrumented.");
+    }
+
+    // Don't try to rewrite classes loaded by the bootstrap class
+    // loader if this class wasn't loaded by the bootstrap class
+    // loader.
+    if (AllocationRecorder.class.getClassLoader() != null) {
+      canRewriteBootstrap = false;
+      // The loggers aren't installed yet, so we use println.
+      System.err.println("Class loading breakage: Will not be able to instrument JDK classes");
+      return;
+    }
+
+    canRewriteBootstrap = true;
+    List<String> args = Arrays.asList(agentArgs == null ? new String[0] : agentArgs.split(","));
+
+    // When "subclassesAlso" is specified, samplers are also invoked when
+    // SubclassOfA.<init> is called while only class A is specified to be
+    // instrumented.
+    ConstructorInstrumenter.subclassesAlso = args.contains("subclassesAlso");
+    inst.addTransformer(new ConstructorInstrumenter(), inst.isRetransformClassesSupported());
+
+    if (!args.contains("manualOnly")) {
+      bootstrap(inst);
+    }
+  }
+
+
+
   public static void premain(String agentArgs, Instrumentation inst) {
 
 	System.load(System.getenv("JXPerf_HOME") + "/build/libagent.so");

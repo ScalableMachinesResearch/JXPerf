@@ -1,0 +1,5 @@
+Application {
+    name: kissbench_std_list
+    use: kissmalloc
+    source: *.cc
+}

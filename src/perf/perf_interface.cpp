@@ -59,7 +59,7 @@ static uint32_t num_events = 0;
 static sample_cb_t user_sample_cb = nullptr;
 /*********************************************/
 
-extern __thread bool inside_sig_unsafe_func;
+//extern __thread bool inside_sig_unsafe_func = false;
 
 namespace {
 
@@ -302,7 +302,7 @@ void perf_event_handler(int sig, siginfo_t* siginfo, void* context){
             memset(&sample_data, 0, sizeof(perf_sample_data_t));
 	        sample_data.isPrecise = (ehdr.misc & PERF_RECORD_MISC_EXACT_IP) ? true : false;
             perf_read_record_sample(current->mmap_buf, current->event->attr.sample_type, &sample_data);
-            if (!inside_sig_unsafe_func)
+            //if (!inside_sig_unsafe_func)
                 user_sample_cb(current->id, &sample_data, context, current->event->metric_id1, current->event->metric_id2, current->event->metric_id3);
         }
         else {

@@ -3,7 +3,7 @@ export BUILD_DIR
 
 include ../common.mk
 
-INC_DIRS += $(JAVA_HOME)/include $(JAVA_HOME)/include/linux ./external/hpctoolkit/lib/prof-lean ./external/hpctoolkit ./util ./util/arch/x86-family ../preload $(BUILD_DIR)/thirdparty/include
+INC_DIRS += $(JAVA_HOME)/include $(JAVA_HOME)/include/linux ./external/hpctoolkit/lib/prof-lean ./external/hpctoolkit ./util ./util/arch/x86-family $(BUILD_DIR)/thirdparty/include
 
 CC := gcc
 CXX := g++
@@ -32,7 +32,8 @@ CXXFLAGS += $(COMMON_FLAGS) $(INC_FLAGS) -std=c++11
 all: $(BUILD_DIR)/libagent.so 
 
 $(BUILD_DIR)/libagent.so: $(OBJS_PATH) $(BUILD_DIR)/libhpctoolkit.a 
-	$(LD) -Wl,--whole-archive $(BUILD_DIR)/libhpctoolkit.a -Wl,-no-whole-archive -shared -m64  -Wl,-soname,libagent.so -o $@ $(OBJS_PATH) -Wl,-rpath=$(BUILD_DIR)/thirdparty/lib -L$(BUILD_DIR)/thirdparty/lib -lwatchpoint -lxed -lc -lpfm -ldl -lnuma
+	$(LD) -Wl,--whole-archive $(BUILD_DIR)/libhpctoolkit.a -Wl,-no-whole-archive -shared -m64  -Wl,-soname,libagent.so -o $@ $(OBJS_PATH) -Wl,-rpath=$(BUILD_DIR)/thirdparty/lib -L$(BUILD_DIR)/thirdparty/lib -lwatchpoint -lxed -lc -lpfm -ldl -lnuma -L$(JXPerf_HOME)/src/kissmalloc -lkissmalloc
+	cp $(BUILD_DIR)/libagent.so $(BUILD_DIR)/libstop.so
 
 $(BUILD_DIR)/libhpctoolkit.a:
 	$(MAKE) -C external

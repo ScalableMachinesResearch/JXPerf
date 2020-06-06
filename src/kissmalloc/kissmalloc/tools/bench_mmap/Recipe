@@ -1,0 +1,4 @@
+Application {
+    name: kissbench_mmap
+    source: *.c
+}

@@ -18,3 +18,7 @@
     3) "Match Times" and "Mismatch Times": the match and mismatch times of one object
     4) "Match Percentage": Match Times / (Match Times + Mismatch Times)
     5) "Mismatch Percentage": Mismatch Times / (Match Times + Mismatch Times)
+
+5. Attach to a running JVM
+  a. Open run_attach.sh and modify the pid
+  b. ./run_attach.sh <running time in seconds>
