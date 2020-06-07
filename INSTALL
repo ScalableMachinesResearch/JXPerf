@@ -37,5 +37,4 @@
         (3) The objects having both high L1 cache misses and allocation times are primary optimization candidates
 
 8. Attach to a running JVM
-  a. Open run_attach.sh and modify the pid
-  b. ./run_attach.sh <running time in seconds>
+  a. ./run_attach.sh <pid> <running time in seconds>
