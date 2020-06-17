@@ -1,4 +1,5 @@
 export JXPerf_HOME=<your JXPerf home>
 export JAVA_HOME=<your Java home>
 export PATH=$JAVA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$JXPerf_HOME/src/kissmalloc
 export JAVA_AGENT=$JXPerf_HOME/thirdparty/allocation-instrumenter/target/java-allocation-instrumenter-HEAD-SNAPSHOT.jar
