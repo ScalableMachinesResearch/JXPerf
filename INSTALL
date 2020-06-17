@@ -37,4 +37,9 @@
         (3) The objects having both high L1 cache misses and allocation times are primary optimization candidates
 
 8. Attach to a running JVM
-  a. ./run_attach.sh <pid> <running time in seconds>
+  a. Open run_attach.sh and change MODE to one of below modes:
+    DataCentric::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@<sampling rate>
+    DeadStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate>
+    SilentStore::MEM_UOPS_RETIRED:ALL_STORES:precise=2@<sampling rate>
+    SilentLoad::MEM_UOPS_RETIRED:ALL_LOADS:precise=2@<sampling rate>
+  b. ./run_attach.sh <pid> <running time in seconds>
