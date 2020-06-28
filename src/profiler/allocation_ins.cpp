@@ -1,9 +1,17 @@
 #include "allocation_ins.h"
 
+typedef struct {
+    const void *src;
+    size_t n;
+} relocation_info_t;
+
 #define MAX_FRAME_NUM (128)
 extern SpinLock tree_lock;
 extern interval_tree_node *splay_tree_root;
 extern __thread uint64_t totalAllocTimes;
+
+extern SpinLock relocation_map_lock;
+extern std::unordered_map<void*, relocation_info_t> relocation_map;
 
 namespace {
 	Context *allocation_constructContext(ASGCT_FN asgct, void *context, std::string client_name){
@@ -63,11 +71,49 @@ void empty_splay_tree(interval_tree_node *root) {
 
 JNIEXPORT void JNICALL
 Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_clearTree(JNIEnv *env, jobject obj) {
-    profiler_safe_enter();
+    void* startaddress;
+    interval_tree_node *del_tree;
+    void* new_startingAddr;
+    uint64_t endingAddr;
+    Context *ctxt;
+
     tree_lock.lock();
-    empty_splay_tree(splay_tree_root);
-    splay_tree_root = NULL; //splay_tree_root also has been removed in empty_splay tree, we couldn't insert anything if we don't reinitialize it here
+    //empty_splay_tree(splay_tree_root);
+    //splay_tree_root = NULL; //splay_tree_root also has been removed in empty_splay tree, we couldn't insert anything if we don't reinitialize it here
+    relocation_map_lock.lock();
+    for(std::unordered_map<void*, relocation_info_t>::iterator i = relocation_map.begin(); i != relocation_map.end(); i++) {
+        interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void *)i->second.src, &startaddress);
+        if (p != NULL) {
+            SplayTree::interval_tree_delete(&splay_tree_root, &del_tree, p);
+            new_startingAddr = i->first;
+            endingAddr = (uint64_t)new_startingAddr + (uint64_t)i->second.n;
+            ctxt = p->node_ctxt;
+            interval_tree_node *node = SplayTree::node_make(new_startingAddr, (void*)endingAddr, ctxt);
+            SplayTree::interval_tree_insert(&splay_tree_root, node);
+        }   
+    }
+    relocation_map.clear();
+    relocation_map_lock.unlock();
     tree_lock.unlock();
+    
+}
+
+JNIEXPORT void JNICALL Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_removeReclaimedObjectInSplayTree(JNIEnv *env, jobject obj, jstring addr) {
+    profiler_safe_enter();
+
+    interval_tree_node *del_tree;
+    void* startaddress;
+    const char *tmp = env->GetStringUTFChars(addr, 0);
+    char *pend;
+    uint64_t startingAddr = strtol(tmp, &pend, 16);
+
+    tree_lock.lock();
+    interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void *)startingAddr, &startaddress);
+    if (p != NULL) {
+        SplayTree::interval_tree_delete(&splay_tree_root, &del_tree, p);
+    }
+    tree_lock.unlock();
+
     profiler_safe_exit();
 }
 

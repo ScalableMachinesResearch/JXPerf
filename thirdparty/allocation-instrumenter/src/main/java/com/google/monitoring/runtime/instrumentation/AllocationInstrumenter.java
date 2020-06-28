@@ -124,7 +124,7 @@ public class AllocationInstrumenter implements ClassFileTransformer {
                 throw new AssertionError("Not supported");
         }
         return tmp;
-    }
+  }
 
   private static Unsafe getUnsafe() {
         try {
@@ -135,11 +135,18 @@ public class AllocationInstrumenter implements ClassFileTransformer {
             throw new AssertionError(e);
         }  
   }
-  
 
   public native void dataCentric(String addr, long size);
   public native void clearTree();
+  public native void removeReclaimedObjectInSplayTree(String addr);
   
+  @Override
+  protected void finalize() throws Throwable {
+      AllocationInstrumenter ai = new  AllocationInstrumenter();
+      String res = printAddresses(this);
+      ai.removeReclaimedObjectInSplayTree(res);
+      super.finalize();
+  }
 
   public static void register_callback(String[] args)
   {

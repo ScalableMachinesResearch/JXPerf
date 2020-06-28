@@ -3,6 +3,7 @@
 #define _ALLOCTION_INS_H
 
 #include <jni.h>
+#include <unordered_map>
 #include "profiler.h"
 #include "safe-sampling.h"
 #include "splay.h"
@@ -33,6 +34,14 @@ JNIEXPORT void JNICALL Java_com_google_monitoring_runtime_instrumentation_Alloca
  */
 JNIEXPORT void JNICALL Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_clearTree
   (JNIEnv *, jobject);
+
+/*
+ * Class:     com_google_monitoring_runtime_instrumentation_AllocationInstrumenter
+ * Method:    removeReclaimedObjectInSplayTree
+ * Signature: (Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_removeReclaimedObjectInSplayTree
+  (JNIEnv *, jobject, jstring);
 
 #ifdef __cplusplus
 }

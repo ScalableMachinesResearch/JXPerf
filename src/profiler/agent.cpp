@@ -28,6 +28,9 @@ JavaVM* JVM::_jvm = nullptr;
 jvmtiEnv* JVM::_jvmti = nullptr;
 Argument* JVM::_argument = nullptr;
 
+extern SpinLock tree_lock;
+extern interval_tree_node *splay_tree_root;
+
 
 void JVM::parseArgs(const char *arg) {
   _argument = new(std::nothrow) Argument(arg);
@@ -197,7 +200,41 @@ static void JNICALL callbackCompiledMethodUnload(jvmtiEnv *jvmti_env, jmethodID 
     Profiler::getProfiler().getCodeCacheManager().removeMethod(method, code_addr);
     UNBLOCK_SAMPLE;
 }
-static void JNICALL callbackDynamicCodeGenerated(jvmtiEnv *jvmti_env, const char* name, const void* address, jint length) {
+
+static void JNICALL callbackGCRelocationReclaim(jvmtiEnv *jvmti_env, const char* new_addr, const void* old_addr, jint length) {
+  if (splay_tree_root != NULL) {
+    void* startaddress;
+    interval_tree_node *del_tree;
+    int flag = length;
+    // handle GC relocation
+    if (flag != 0) {
+      void* new_startingAddr = (void*)new_addr;
+      void* old_startingAddr = (void*)old_addr;
+      Context *ctxt;
+      uint64_t size = length;
+      uint64_t endingAddr = (uint64_t)new_startingAddr + size;
+
+      tree_lock.lock();
+      interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, old_startingAddr, &startaddress);
+      if (p != NULL) {
+        ctxt = p->node_ctxt;
+        SplayTree::interval_tree_delete(&splay_tree_root, &del_tree, p);
+        interval_tree_node *node = SplayTree::node_make(new_startingAddr, (void*)endingAddr, ctxt);
+        SplayTree::interval_tree_insert(&splay_tree_root, node);
+      }
+      tree_lock.unlock();
+    }
+    // handle GC reclaim
+    else {
+      void* old_startingAddr = (void*)old_addr;
+      tree_lock.lock();
+      interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, old_startingAddr, &startaddress);
+      if (p != NULL) {
+        SplayTree::interval_tree_delete(&splay_tree_root, &del_tree, p);  
+      }
+      tree_lock.unlock();
+    }
+  }
 }
 
 // This has to be here, or the VM turns off class loading events.
@@ -313,7 +350,8 @@ bool JVM::init(JavaVM *jvm, const char *arg, bool attach) {
   ////callbacks.NativeMethodBind = &callbackNativeMethodBind;
   callbacks.CompiledMethodLoad = &callbackCompiledMethodLoad;
   callbacks.CompiledMethodUnload = &callbackCompiledMethodUnload;
-  callbacks.DynamicCodeGenerated = &callbackDynamicCodeGenerated;
+  //not use DynamicCodeGenerated this time
+  //callbacks.DynamicCodeGenerated = &callbackGCRelocationReclaim;
 
   callbacks.ClassLoad = &callbackClassLoad;
   callbacks.ClassPrepare = &callbackClassPrepare;
