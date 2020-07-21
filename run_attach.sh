@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ATTACH=$JXPerf_HOME/attach/attach
+ATTACH=$JXPerf_HOME/attach/source/run/attach
 MODE=DataCentric::MEM_LOAD_UOPS_RETIRED:L1_MISS:precise=2@1000000
 PID="$1"
 DURATION="$2"

@@ -32,7 +32,7 @@ CXXFLAGS += $(COMMON_FLAGS) $(INC_FLAGS) -std=c++11
 all: $(BUILD_DIR)/libagent.so 
 
 $(BUILD_DIR)/libagent.so: $(OBJS_PATH) $(BUILD_DIR)/libhpctoolkit.a 
-	$(LD) -Wl,--whole-archive $(BUILD_DIR)/libhpctoolkit.a -Wl,-no-whole-archive -shared -m64  -Wl,-soname,libagent.so -o $@ $(OBJS_PATH) -Wl,-rpath=$(BUILD_DIR)/thirdparty/lib -L$(BUILD_DIR)/thirdparty/lib -lwatchpoint -lxed -lc -lpfm -ldl -lnuma -L$(JXPerf_HOME)/src/kissmalloc -lkissmalloc
+	$(LD) -Wl,--whole-archive $(BUILD_DIR)/libhpctoolkit.a -Wl,-no-whole-archive -shared -m64  -Wl,-soname,libagent.so -o $@ $(OBJS_PATH) -Wl,-rpath=$(BUILD_DIR)/thirdparty/lib -L$(BUILD_DIR)/thirdparty/lib -lwatchpoint -lxed -lc -lpfm -ldl -lnuma -L$(JXPerf_HOME)/src/kissmalloc -lkissmalloc -L$(JXPerf_HOME)/preload -lpreload
 	cp $(BUILD_DIR)/libagent.so $(BUILD_DIR)/libstop.so
 
 $(BUILD_DIR)/libhpctoolkit.a:
