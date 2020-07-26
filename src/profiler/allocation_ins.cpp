@@ -78,8 +78,12 @@ Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_clearT
     Context *ctxt;
 
     tree_lock.lock();
-    //empty_splay_tree(splay_tree_root);
-    //splay_tree_root = NULL; //splay_tree_root also has been removed in empty_splay tree, we couldn't insert anything if we don't reinitialize it here
+#if 0
+    empty_splay_tree(splay_tree_root);
+    splay_tree_root = NULL; //splay_tree_root also has been removed in empty_splay tree, we couldn't insert anything if we don't reinitialize it here
+#endif
+
+#if 1
     relocation_map_lock.lock();
     for(std::unordered_map<void*, relocation_info_t>::iterator i = relocation_map.begin(); i != relocation_map.end(); i++) {
         interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void *)i->second.src, &startaddress);
@@ -95,7 +99,7 @@ Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_clearT
     relocation_map.clear();
     relocation_map_lock.unlock();
     tree_lock.unlock();
-    
+#endif
 }
 
 JNIEXPORT void JNICALL Java_com_google_monitoring_runtime_instrumentation_AllocationInstrumenter_removeReclaimedObjectInSplayTree(JNIEnv *env, jobject obj, jstring addr) {
