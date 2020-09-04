@@ -1,0 +1,3 @@
+[submodule "thirdparty/all-ins"]
+	path = thirdparty/all-ins
+	url = https://github.com/google/allocation-instrumenter.git
