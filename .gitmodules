@@ -1,0 +1,3 @@
+[submodule "xed"]
+	path = thirdparty/xed
+	url = https://github.com/intelxed/xed
