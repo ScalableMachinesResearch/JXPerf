@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+
 # -*- python -*-
 #BEGIN_LEGAL
 #
@@ -15,7 +16,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#  
+#
 #END_LEGAL
 
 
@@ -47,7 +48,7 @@ def try_mbuild_import():
         return True
     except:
         return False
-    
+
 def find_mbuild_import():
     if try_mbuild_import():
         # mbuild is already findable by PYTHONPATH. Nothing required from
@@ -68,25 +69,25 @@ def find_mbuild_import():
         mbuild_install_path = mbuild_install_path_relative
         if not os.path.exists(mbuild_install_path):
             s = "mfile.py cannot find the mbuild directory: [%s] or [%s]"
-            fatal(s % (mbuild_install_path_derived, 
+            fatal(s % (mbuild_install_path_derived,
                        mbuild_install_path_relative))
 
     # modify the environment python path so that the imported modules
     # (enumer,codegen) can find mbuild.
-    
+
     if 'PYTHONPATH' in os.environ:
         sep = ':'
         os.environ['PYTHONPATH'] =  mbuild_install_path + sep +  \
                                     os.environ['PYTHONPATH']
     else:
-        os.environ['PYTHONPATH'] =  mbuild_install_path 
+        os.environ['PYTHONPATH'] =  mbuild_install_path
 
     sys.path.insert(0,mbuild_install_path)
-    
+
 def work():
-    if sys.version_info[0] == 3 and sys.version_info[1] < 4:        
+    if sys.version_info[0] == 3 and sys.version_info[1] < 4:
         fatal("Need python version 3.4 or later.")
-    if sys.version_info[0] == 2 and sys.version_info[1] < 7:        
+    if sys.version_info[0] == 2 and sys.version_info[1] < 7:
         fatal("Need python version 2.7 or later.")
     try:
         find_mbuild_import()
@@ -99,8 +100,8 @@ def work():
     except Exception as e:
         xed_build_common.handle_exception_and_die(e)
     return retval
-    
+
 if __name__ == "__main__":
     retval = work()
     sys.exit(retval)
- 
+

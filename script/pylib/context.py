@@ -5,6 +5,7 @@ class Context:
 		self.id = ctxt_id
 		self.method_version = None
 		self.binary_addr = None
+		self.numa_node = None
 		self.method_id = None
 		self.bci = None
 		self.metrics_type = None
@@ -18,10 +19,12 @@ class Context:
 		return self._children_id_set
 	def hasChildren(self):
 		return len(self._children_id_set) > 0
+	def hasParent(self):
+		return self._parent_id != None
 	def setParentID(self, p_id):
 		self._parent_id = p_id
 	def getParentID(self):
-		return self._Parent_id	
+		return self._parent_id	
 
 
 class ContextManager:
@@ -103,10 +106,56 @@ class ContextManager:
 	def isLeaf(self, context):
 		context = self._id2context(context)
 		return not context.hasChildren()
+	
+	def getAllLeafNode(self, node_id, leaf_node_list):
+		## description: "root-leaf" | "root-subnode"
+		node_context = self._id2context(node_id)
+		if node_context.hasChildren():
+			for c_id in node_context.getChildrenIDs():
+				self.getAllLeafNode(c_id, leaf_node_list)
+		else:
+			leaf_node_list += [node_context]
+		return leaf_node_list
+
+	def getTraceFromLeafNode(self, leaf_node):
+		trace = []
+		temp_node = leaf_node
+		while  temp_node != None:
+			trace += [temp_node]
+			if temp_node.getParentID() == None:
+				temp_node = None
+			else:
+				if temp_node.getParentID() == "-1":
+					temp_node = None
+				else:
+					temp_node = self._id2context(temp_node.getParentID())
+		return trace
+
+	def getAllRtrace(self, root_id):
+		rtraces = []
+		leaf_node_list = []
+		self.getAllLeafNode(root_id, leaf_node_list)
+		for leaf_node in leaf_node_list:
+			rtraces += [self.getTraceFromLeafNode(leaf_node)]
+		return rtraces
+
+	
+	def getFirstTrace(self, root_id, trace):
+		## description: "root-leaf" | "root-subnode"
 		
+		root_context = self._id2context(root_id)
+		if root_context.hasChildren():
+			for c_id in root_context.getChildrenIDs():
+				trace = self.getFirstTrace(c_id, trace)
+				break
+		trace += [root_context]
+		return trace
+
+
 	def getAllPaths(self, root, description):
 		## description: "root-leaf" | "root-subnode"
 		root = self._id2context(root)
+		# print(root)
 		assert(description in ["root-leaf", "root-subnode"])
 
 		if root.hasChildren():

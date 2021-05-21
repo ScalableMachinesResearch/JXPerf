@@ -178,7 +178,7 @@ public class AllocationInstrumenter implements ClassFileTransformer {
 
   public static void premain(String agentArgs, Instrumentation inst) {
 
-	System.load(System.getenv("JXPerf_HOME") + "/build/libagent.so");
+	System.load(System.getenv("OJXPerf_HOME") + "/build/libagent.so");
 
     AllocationRecorder.setInstrumentation(inst);
 

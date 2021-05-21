@@ -8,7 +8,7 @@ class CSVWriter:
 		else:
 			self._file_name = file_name + ".csv"
 		self._field_list = field_list
-		self._row_list = [] 
+		self._row_list = []
 	def writeRow(self, row_dict):
 		assert(isinstance(row_dict, dict))
 		self._row_list.append(row_dict)

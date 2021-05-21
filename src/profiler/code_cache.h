@@ -48,6 +48,7 @@ public:
   bool isAddrIn(void *addr);
   void loadAddrLocationMap(const jvmtiAddrLocationMap* map, jint map_length);
   int32_t addr2line(uint64_t addr);
+  int32_t startLine();
   inline const uint32_t getMethodVersion(){return _version;}
   // inline const uint64_t getFirstPC() {return _first_pc;}
   void getMethodBoundary(void **start_addr, void **end_addr);

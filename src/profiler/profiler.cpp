@@ -240,8 +240,9 @@ void Profiler::ObjectLevelRedundancy(perf_sample_data_t *sampleData, void *uCtxt
         }
 		else {
             std::vector<wp_info_t>::iterator it = allocation_callback_ctxt[ctxt].watchpoint_info.begin();
-            allocation_callback_ctxt[ctxt].sample_count++;
+            //allocation_callback_ctxt[ctxt].sample_count++;
             if(allocation_callback_ctxt[ctxt].sample_count <= allocation_callback_ctxt[ctxt].avail_wp) {
+                allocation_callback_ctxt[ctxt].sample_count++;
                 switch(xx_type) {
                     case XED_OPERAND_XTYPE_F32:
                     case XED_OPERAND_XTYPE_F64:

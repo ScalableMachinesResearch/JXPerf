@@ -3,7 +3,7 @@
 CURRENT_DIR=$(shell pwd)
 
 thirdparty:
-	#git submodule update
+	git submodule update
 	cd thirdparty/watchpoint-lib && make install PREFIX=$(CURRENT_DIR)/build/thirdparty
 	cd thirdparty/xed && ./mfile.py --debug --shared --prefix=$(CURRENT_DIR)/build/thirdparty install
 	cd thirdparty/libpfm-4.10.1 &&  make PREFIX=$(CURRENT_DIR)/build/thirdparty install

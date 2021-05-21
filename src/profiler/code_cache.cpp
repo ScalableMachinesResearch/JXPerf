@@ -120,9 +120,8 @@ void Method::loadBCILineTable() {
   
 }
 
-CompiledMethod::CompiledMethod(jmethodID method_id, uint32_t version, jint code_size, const void* code_addr):Method(method_id) {
+CompiledMethod::CompiledMethod(jmethodID method_id, uint32_t version, jint code_size, const void* code_addr) : Method(method_id), _code_size(code_size) {
   _version = version;
-  _code_size = code_size;
   _start_addr = (uint64_t)code_addr;
 }
 
@@ -155,9 +154,10 @@ void CompiledMethod::loadAddrLocationMap(const jvmtiAddrLocationMap* map, jint m
   end_addr = (uint64_t)map[0].start_address - 1;
   assert(start_addr <= end_addr);
   //if (start_addr <= end_addr) {
-    assert(_bci2line_rangeset.getData(map[0].location, lineno));
+    if(_bci2line_rangeset.getData(map[0].location, lineno) == 0)
+        return;
     _addr2line_rangeset.insert(start_addr, end_addr, lineno); 
-  // }
+   //}
   
   // NOTE: map[0].start_address > _start_addr. Therefore, there is some code can't be mapped.
   for(int i = 0; i < map_length - 1; i++) {
@@ -171,7 +171,8 @@ void CompiledMethod::loadAddrLocationMap(const jvmtiAddrLocationMap* map, jint m
     
     // assert(_bci2line_rangeset.getData(map[i].location, lineno));
     // off-by-1 line NO.
-    assert(_bci2line_rangeset.getData(map[i + 1].location, lineno));
+    if (_bci2line_rangeset.getData(map[i + 1].location, lineno) == 0)
+      return;
     _addr2line_rangeset.insert(start_addr, end_addr, lineno); 
   }
   /*
@@ -196,6 +197,14 @@ int32_t CompiledMethod::addr2line(const uint64_t addr) {
   return line;
 }
 
+int32_t CompiledMethod::startLine() {
+  int32_t line = 0;
+  if (_addr2line_rangeset.isEmpty()) // the address has not been set
+    return -1;
+  _addr2line_rangeset.getData(_start_addr, line);
+  return line;
+}
+
 void CompiledMethod:: getMethodBoundary(void **start_addr, void **end_addr) {
     *start_addr = (void *)_start_addr;
     *end_addr = (void *)(_start_addr + _code_size - 1);
@@ -211,43 +220,47 @@ XMLObj * createXMLObj(CompiledMethod *instance){
   SET_ATTR(obj, "id",instance->getMethodID());
   SET_ATTR(obj, "version", instance->_version);
   SET_ATTR(obj, "code_size", instance->_code_size);
+  SET_ATTR(obj, "start_line", instance->startLine());
   SET_ATTR(obj, "start_addr", instance->_start_addr);  
-  SET_ATTR(obj, "name", instance->getMethodName().c_str());
-  SET_ATTR(obj, "file", instance->getSourceFile().c_str());
-  SET_ATTR(obj, "class", instance->getClassName().c_str());
+  SET_ATTR(obj, "name", formate_speical_char(instance->getMethodName()).c_str());
+  SET_ATTR(obj, "file", formate_speical_char(instance->getSourceFile()).c_str());
+  SET_ATTR(obj, "class", formate_speical_char(instance->getClassName()).c_str());
 
+  int obj_index = 0;
   if ( !instance->_addr2line_rangeset.isEmpty())
   {
-  XMLObj *c_obj = new(std::nothrow) XMLObj("addr2line");
-  assert(c_obj);
-  auto all_range = instance->_addr2line_rangeset.getAllRanges();
+  XMLObj *al_obj = new(std::nothrow) XMLObj("toline");
+  assert(al_obj);
+  SET_ATTR(al_obj, "type", "addr2line");
+  auto al_all_range = instance->_addr2line_rangeset.getAllRanges();
   int i = 0;
-  for(auto &elem : all_range){
+  for(auto &elem : al_all_range){
     XMLObj *cc_obj = new(std::nothrow) XMLObj("range");
     assert(cc_obj);
     SET_ATTR(cc_obj, "start", elem.start);
     SET_ATTR(cc_obj, "end", elem.end);
     SET_ATTR(cc_obj, "data", elem.data);
-    c_obj->addChild(i++, cc_obj);
+    al_obj->addChild(i++, cc_obj);
   } 
-  obj->addChild(1, c_obj);
+  obj->addChild(obj_index++, al_obj);
   }
   
   if (!instance->_bci2line_rangeset.isEmpty())
   {
-  XMLObj *c_obj = new(std::nothrow) XMLObj("bci2line");
-  assert(c_obj);
-  auto all_range = instance->_bci2line_rangeset.getAllRanges();
+  XMLObj *bl_obj = new(std::nothrow) XMLObj("toline");
+  assert(bl_obj);
+  SET_ATTR(bl_obj, "type", "bci2line");
+  auto bl_all_range = instance->_bci2line_rangeset.getAllRanges();
   int i = 0;
-  for (auto &elem : all_range){
+  for (auto &elem : bl_all_range){
     XMLObj *cc_obj = new(std::nothrow) XMLObj("range");
     assert(cc_obj);
     SET_ATTR(cc_obj, "start", elem.start);
     SET_ATTR(cc_obj, "end", elem.end);
     SET_ATTR(cc_obj, "data", elem.data);
-    c_obj->addChild(i++,cc_obj);
+    bl_obj->addChild(i++,cc_obj);
   }
-  obj->addChild(2, c_obj);
+  obj->addChild(obj_index++, bl_obj);
   }
 #undef SET_ATTR
   return obj;
@@ -256,9 +269,7 @@ XMLObj * createXMLObj(CompiledMethod *instance){
 }
 
 
-CompiledMethodGroup::CompiledMethodGroup(jmethodID method_id) {
-  _method_id = method_id;
-}
+CompiledMethodGroup::CompiledMethodGroup(jmethodID method_id) : _method_id(method_id) {}
 
 CompiledMethodGroup::~CompiledMethodGroup() {
   for (auto &elem : _address_method_map){
@@ -271,7 +282,7 @@ CompiledMethod *CompiledMethodGroup::addMethod(jint code_size, const void *code_
   
   uint32_t version = ++_recent_version;
   uint64_t start_addr = (uint64_t) code_addr;
-  assert(_address_method_map.find(start_addr) == _address_method_map.end()); // check whether it has been added
+  // assert(_address_method_map.find(start_addr) == _address_method_map.end()); // check whether it has been added
   
   lock_scope.unsetLock();
   CompiledMethod * new_method = new(std::nothrow) CompiledMethod(_method_id, version, code_size, code_addr);
@@ -334,14 +345,16 @@ xml::XMLObj *InterpretMethod::createXMLObj() {
   SET_ATTR(obj, "id",getMethodID());
   SET_ATTR(obj, "version", 0);
   SET_ATTR(obj, "code_size", 0);
-  SET_ATTR(obj, "start_addr", 0);  
-  SET_ATTR(obj, "name", getMethodName().c_str());
-  SET_ATTR(obj, "file", getSourceFile().c_str());
-  SET_ATTR(obj, "class", getClassName().c_str());
-
+  SET_ATTR(obj, "start_line", -1);
+  SET_ATTR(obj, "start_addr", 0);
+  SET_ATTR(obj, "name", formate_speical_char(getMethodName()).c_str());
+  SET_ATTR(obj, "file", formate_speical_char(getSourceFile()).c_str());
+  SET_ATTR(obj, "class", formate_speical_char(getClassName()).c_str());
+  int obj_index = 0;
   if (!_bci2line_rangeset.isEmpty()) {
-  xml::XMLObj *c_obj = new(std::nothrow) xml::XMLObj("bci2line");
-  assert(c_obj);
+  xml::XMLObj *bl_obj = new(std::nothrow) xml::XMLObj("toline");
+  assert(bl_obj);
+  SET_ATTR(bl_obj, "type", "bci2line");
   auto all_range = _bci2line_rangeset.getAllRanges();
   int i = 0;
   for (auto &elem : all_range) {
@@ -350,9 +363,9 @@ xml::XMLObj *InterpretMethod::createXMLObj() {
     SET_ATTR(cc_obj, "start", elem.start);
     SET_ATTR(cc_obj, "end", elem.end);
     SET_ATTR(cc_obj, "data", elem.data);
-    c_obj->addChild(i++,cc_obj);
+    bl_obj->addChild(i++,cc_obj);
   }
-  obj->addChild(2, c_obj);
+  obj->addChild(obj_index++, bl_obj);
   }
 #undef SET_ATTR
   return obj;

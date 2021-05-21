@@ -15,7 +15,7 @@ class ThreadWorker(threading.Thread):
 	def run(self):
 		self._work_routine(self._input_data)
 		self._finish_cb(self)
-		
+
 class WorkerManager:
 	def _workerFinish(self, worker):
 		self._lock.acquire()

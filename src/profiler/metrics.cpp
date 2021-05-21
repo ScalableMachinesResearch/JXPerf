@@ -55,17 +55,21 @@ XMLObj *createXMLObj(ContextMetrics * instance) {
         
         /*int min_red_byte = MetricInfoManager::getMetricInfo(i)->threshold * 10;
         if (metric_val.i >= min_red_byte || metric_val.r >= min_red_byte)*/ isLargeRedundancy = true;
-        
+        if (!(metric_val.i || metric_val.r)) {
+            continue;
+        }
         XMLObj *child_obj = new(std::nothrow) XMLObj("metric");
         assert(child_obj);
         SET_ATTR(child_obj, "id", i);
 
         if (metric_val.i) {
             SET_ATTR(child_obj, "value1", metric_val.i);
+            SET_ATTR(child_obj, "value2", -1);
             // assert(child_obj->hasAttr("type", "FP") == false);
             // SET_ATTR(child_obj, "type1", "PRECISE");
         }   
         if (metric_val.r) {
+            SET_ATTR(child_obj, "value1", -1);
             SET_ATTR(child_obj, "value2", metric_val.r);
             // assert(child_obj->hasAttr("type", "INT") == false);
             // SET_ATTR(child_obj, "type2", "APPROXIMATE");
