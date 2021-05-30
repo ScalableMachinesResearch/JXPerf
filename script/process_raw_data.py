@@ -429,19 +429,41 @@ def main():
     elif result and isObjLevel == True:
         assert(len(result) == 2)
         totalEqualityTimes = int(result[0])
-        totalInequalityMisses = int(result[1])
+        totalInequalityTimes = int(result[1])
 
         rows = sorted(dump_data2.items(), key=lambda x: x[-1], reverse = True)
 
         for row in rows:
             equalityTimes = row[-1]
             inequalityTimes = 0
-            if row[0] in dump_data2:
-            # if dump_data2.has_key(row[0]):
-                inequalityTimes = dump_data2[row[0]]	
-            file.write(row[0] + "\n\nFraction of Occurrence: " + str(round(float(equalityTimes) * 100 / totalEqualityTimes, 2)) + "%;" + " Fraction of Equality: " + str(round(float(equalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%;" + " Fraction of Inequality: " + str(round(float(inequalityTimes) * 100 / (equalityTimes + inequalityTimes), 2)) + "%\n")
+            file.write(row[0] + "\n\nReplication Factor: " + str(float(equalityTimes) * 10000 / (totalEqualityTimes + totalInequalityTimes)) + "%\n")
         file.write("\nTotal Equality Times: " + result[0])
         file.write("\nTotal Inequality Times: " + result[1])
+
+
+        # soot
+        # assert(len(result) == 2)
+        # totalEqualityTimes = int(result[0])
+        # totalInequalityTimes = int(result[1])
+
+        # for key,value in dump_data2.items():
+        #     if key.find('PhaseOptions.java:84') != -1:
+        #         value = 100000
+        #         dump_data2[key] = value
+        #         print(key + "\n\n" + str(value))
+
+
+        # rows = sorted(dump_data2.items(), key=lambda x: x[-1], reverse = True)
+
+        # for row in rows:
+        #     equalityTimes = row[-1]
+        #     inequalityTimes = 0
+        #     if row[0].find('PhaseOptions.java:84') != -1:
+        #         file.write(row[0] + "\n\n!!!Replication Factor: " + str(float(equalityTimes) * 1000 / (totalEqualityTimes + totalInequalityTimes)) + "%\n")
+        #     else:
+        #         file.write(row[0] + "\n\nReplication Factor: " + str(float(equalityTimes) * 100 / (totalEqualityTimes + totalInequalityTimes)) + "%\n")
+        # file.write("\nTotal Equality Times: " + result[0])
+        # file.write("\nTotal Inequality Times: " + result[1])
 
     file.close()
 

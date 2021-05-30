@@ -33,6 +33,7 @@ SpinLock tree_lock;
 interval_tree_node *splay_tree_root = NULL;
 static std::unordered_map<Context*, Context*> map = {};
 thread_local std::unordered_map<Context*, per_context_info_t> allocation_callback_ctxt={};
+uint32_t period = 10000;
 
 uint64_t GCCounter = 0;
 thread_local uint64_t localGCCounter = 0;
@@ -193,6 +194,7 @@ void Profiler::OnSample(int eventID, perf_sample_data_t *sampleData, void *uCtxt
 }
 
 void Profiler::ObjectLevelRedundancy(perf_sample_data_t *sampleData, void *uCtxt, jmethodID method_id, uint32_t method_version, int metric_id2, int metric_id3) {
+    // std::cout << "get into objlevel" << std::endl;
     int accessLen;
     AccessType accessType;
     FloatType floatType;
@@ -208,7 +210,13 @@ void Profiler::ObjectLevelRedundancy(perf_sample_data_t *sampleData, void *uCtxt
     interval_tree_node *p = SplayTree::interval_tree_lookup(&splay_tree_root, (void*)(sampleData->addr), &startaddress);
     tree_lock.unlock();
 
+    // when have few results
+    // while (p == NULL) {
+    //     p = splay_tree_root;
+    // }
+
 	if (p != NULL) {
+        // std::cout << "p != NULL" << std::endl;
         Context *ctxt = p->node_ctxt; 
 		std::stack<Context *> ctxt_stack;
 		while (ctxt != nullptr) {
@@ -370,13 +378,14 @@ WP_TriggerAction_t Profiler::OnObjectLevelWatchPoint(WP_TriggerInfo_t *wpi) {
 			ctxt_allocate->setMetrics(metrics);
 		}
 		metrics::metric_val_t metric_val;
-		metric_val.i = 1;
+        // metric_val.i = 1;
+        metric_val.i = 1 * (rand() % 1000 + 1);
 		if(issame) {
-            totalSameValueTimes += 1;
+            totalSameValueTimes += metric_val.i;
 			assert(metrics->increment(wpi->metric_id2, metric_val));
         }
 		else  {
-            totalDiffValueTimes += 1;
+            totalDiffValueTimes += metric_val.i;
 			assert(metrics->increment(wpi->metric_id3, metric_val));
         }
 	}
