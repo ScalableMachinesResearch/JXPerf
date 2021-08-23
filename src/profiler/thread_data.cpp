@@ -39,7 +39,7 @@ thread_data_t *thread_data_get() {
 
 void thread_data_dealloc() {
     thread_data_t *td_ptr = (thread_data_t*) pthread_getspecific(key);
-    assert (td_ptr != nullptr);
+    if (td_ptr != nullptr) {
     // make sure each field is properly freed
     assert(td_ptr->perf_state == nullptr);
     assert(td_ptr->context_state == nullptr);
@@ -53,6 +53,7 @@ void thread_data_dealloc() {
     delete td_ptr;
     td_ptr = nullptr;
     pthread_setspecific(key, nullptr);
+    }
 }
 
 void thread_data_shutdown(){

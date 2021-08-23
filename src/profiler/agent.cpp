@@ -26,6 +26,9 @@ JavaVM* JVM::_jvm = nullptr;
 jvmtiEnv* JVM::_jvmti = nullptr;
 Argument* JVM::_argument = nullptr;
 
+bool jni_flag = false;
+bool onload_flag = false;
+
 
 void JVM::parseArgs(const char *arg) {
   assert(_argument == nullptr);
@@ -183,6 +186,29 @@ static void JNICALL callbackCompiledMethodLoad(jvmtiEnv *jvmti_env, jmethodID me
   }
 #endif
 
+  std::string client_name = GetClientName();
+
+  if (client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0 || client_name.compare(OBJECT_LEVEL_CLIENT_NAME) == 0) {
+    if (jni_flag) {
+      JNIEnv* jni = JVM::jni();
+    jclass myClass = NULL;
+    jmethodID main = NULL;
+    jmethodID main_gc = NULL;
+        
+    //Call java agent register_callback
+    myClass = jni->FindClass("com/google/monitoring/runtime/instrumentation/AllocationInstrumenter");
+        
+    main = jni->GetStaticMethodID(myClass, "register_callback", "([Ljava/lang/String;)V");
+    jni->CallStaticVoidMethod(myClass, main, " ");
+
+    if(client_name.compare(DATA_CENTRIC_CLIENT_NAME) == 0) {
+        main_gc = jni->GetStaticMethodID(myClass, "installGCMonitoring", "([Ljava/lang/String;)V");
+        jni->CallStaticVoidMethod(myClass, main_gc, " ");
+    }
+    jni_flag = false;
+    }
+  }
+
   CompiledMethod *m = Profiler::getProfiler().getCodeCacheManager().addMethodAndRemoveFromUncompiledSet(method, code_size, code_addr, map_length, map);
   // CompiledMethod *m = Profiler::getProfiler().getCodeCacheManager().addMethod(method, code_size, code_addr, map_length, map);
   // Profiler::getProfiler().getUnCompiledMethodCache().removeMethod(method);
@@ -227,10 +253,31 @@ static void JNICALL callbackClassPrepare(jvmtiEnv* jvmti, JNIEnv* jni, jthread t
 
 
 
+
+void JVM::loadMethodIDs(jvmtiEnv* jvmti, jclass klass) {
+    jint method_count;
+    jmethodID* methods;
+    if (jvmti->GetClassMethods(klass, &method_count, &methods) == 0) {
+        jvmti->Deallocate((unsigned char*)methods);
+    }
+}
+
+void JVM::loadAllMethodIDs(jvmtiEnv* jvmti) {
+    jint class_count;
+    jclass* classes;
+    if (jvmti->GetLoadedClasses(&class_count, &classes) == 0) {
+        for (int i = 0; i < class_count; i++) {
+            loadMethodIDs(jvmti, classes[i]);
+        }
+        jvmti->Deallocate((unsigned char*)classes);
+    }
+}
+
+
 /////////////
 // METHODS //
 /////////////
-bool JVM::init(JavaVM *jvm, const char *arg) {
+bool JVM::init(JavaVM *jvm, const char *arg, bool attach) {
   jvmtiError error;
   jint res;
   jvmtiEventCallbacks callbacks;
@@ -258,48 +305,53 @@ bool JVM::init(JavaVM *jvm, const char *arg) {
     assert(location_format == JVMTI_JLOCATION_JVMBCI);//currently only support this implementation
   }
 
+  Profiler::getProfiler().init();
+
   /////////////////////
   // Init capabilities:
   jvmtiCapabilities capa;
-  memset(&capa, '\0', sizeof(jvmtiCapabilities));
-  //capa.can_signal_thread = 1;
-  //capa.can_get_owned_monitor_info = 1;
-  //capa.can_suspend = 1;
-  //capa.can_generate_exception_events = 1;
-  //capa.can_generate_monitor_events = 1;
+  memset(&capa, '\0', sizeof(jvmtiCapabilities)); 
+  capa.can_generate_all_class_hook_events = 1;
+
   capa.can_generate_garbage_collection_events = 1;
-  capa.can_get_source_file_name = 1; //GetSourceFileName()
-  capa.can_get_line_numbers = 1; // GetLineNumberTable()
-  capa.can_generate_method_entry_events = 1; // This one must be enabled in order to get the stack trace
-  //capa.can_generate_native_method_bind_events = 1;
+  capa.can_get_source_file_name = 1; 
+  capa.can_get_line_numbers = 1; 
+  // capa.can_generate_method_entry_events = 1; // This one must be enabled in order to get the stack trace
   capa.can_generate_compiled_method_load_events = 1;
+  
+  capa.can_retransform_classes = 1;
+  capa.can_retransform_any_class = 1;
+  capa.can_get_bytecodes = 1;
+  capa.can_get_constant_pool = 1;
+  capa.can_generate_monitor_events = 1;
+  capa.can_tag_objects = 1;
+  // capa.can_generate_sampled_object_alloc_events = 1;
 
   error = _jvmti->AddCapabilities(&capa);
   check_jvmti_error(error, "Unable to get necessary JVMTI capabilities.");
 
-  //////////////////
-  // Init callbacks:
   memset(&callbacks, 0, sizeof(callbacks));
+  // callbacks.SampledObjectAlloc = &SampledObjectAlloc;
   callbacks.VMInit = &callbackVMInit;
   callbacks.VMDeath = &callbackVMDeath;
   callbacks.ThreadStart = &callbackThreadStart;
   callbacks.ThreadEnd = &callbackThreadEnd;
   callbacks.GarbageCollectionFinish = &callbackGCEnd;
-
-  ////callbacks.Exception = &callbackException;
-  ////callbacks.MethodEntry = &callbackMethodEntry;
-  ////callbacks.NativeMethodBind = &callbackNativeMethodBind;
   callbacks.CompiledMethodLoad = &callbackCompiledMethodLoad;
   callbacks.CompiledMethodUnload = &callbackCompiledMethodUnload;
-  callbacks.DynamicCodeGenerated = &callbackDynamicCodeGenerated;
-
   callbacks.ClassLoad = &callbackClassLoad;
   callbacks.ClassPrepare = &callbackClassPrepare;
 
   error = _jvmti->SetEventCallbacks(&callbacks, (jint)sizeof(callbacks));
   check_jvmti_error(error, "Cannot set jvmti callbacks");
+
+  // error = _jvmti->SetHeapSamplingInterval(1024 * 1024);
+  // check_jvmti_error(error, "Cannot set interval");
+
   ///////////////
   // Init events:
+  // error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SAMPLED_OBJECT_ALLOC, NULL);
+  // check_jvmti_error(error, "Cannot set event notification");
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_INIT, (jthread)NULL);
   check_jvmti_error(error, "Cannot set event notification");
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, (jthread)NULL);
@@ -310,37 +362,26 @@ bool JVM::init(JavaVM *jvm, const char *arg) {
   check_jvmti_error(error, "Cannot set event notification");
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_GARBAGE_COLLECTION_FINISH, (jthread)NULL);
   check_jvmti_error(error, "Cannot set event notification");
-  //error = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_EXCEPTION, (jthread)NULL);
-  //check_jvmti_error(jvmti, error, "Cannot set event notification");
-  //error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_METHOD_ENTRY, (jthread)NULL);
-  //check_jvmti_error( error, "Cannot set event notification");
-
-  //error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_NATIVE_METHOD_BIND, (jthread)NULL);
-  //check_jvmti_error( error, "Cannot set event notification");
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_COMPILED_METHOD_LOAD, (jthread)NULL);
   check_jvmti_error(error, "Cannot set event notification");
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_COMPILED_METHOD_UNLOAD, (jthread)NULL);
   check_jvmti_error(error, "Cannot set event notification");
-
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_DYNAMIC_CODE_GENERATED, (jthread)NULL);
   check_jvmti_error(error, "Cannot set event notification");
-
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_LOAD, (jthread)NULL);
   check_jvmti_error(error, "Cannot set event notification");
   error = _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_PREPARE, (jthread)NULL);
   check_jvmti_error(error, "Cannot set event notification");
 
-#if 0
-  error = _jvmti->GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED);
-  check_jvmti_error(error, "Cannot generate DynamicCodeGenerate");
-  error = _jvmti->GenerateEvents(JVMTI_EVENT_COMPILED_METHOD_LOAD);
-  check_jvmti_error(error, "Cannot generate CompiledMethodLoad");
-#endif
-
-  Profiler::getProfiler().init();
+  if (attach) {
+    loadAllMethodIDs(_jvmti);
+    _jvmti->GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED);
+    _jvmti->GenerateEvents(JVMTI_EVENT_COMPILED_METHOD_LOAD);
+  }
 
   return true;
 }
+
 
 bool JVM::shutdown() {
 
@@ -361,8 +402,10 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
   // bool pause = true; while(pause);
 
   BLOCK_SAMPLE;
+  jni_flag = false;
+  onload_flag = true;
   INFO("Agent argument = %s\n", options);
-  if (!JVM::init(jvm, options)) {
+  if (!JVM::init(jvm, options, false)) {
     UNBLOCK_SAMPLE;
     return JNI_ERR;
   }
@@ -372,11 +415,33 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
 }
 
 /**
+* Agent entry point
+*/
+JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) {
+  BLOCK_SAMPLE;
+  onload_flag = false;
+  jni_flag = true;
+  if(options[strlen(options)-1] == 's') {
+    printf("profiler start\n");
+    options[strlen(options)-1] = '\0';
+    JVM::init(jvm, options, true);
+  }
+  else {
+    printf("profiler end\n");
+    JVM::shutdown();
+  }
+  UNBLOCK_SAMPLE;
+  return 0;
+}
+
+/**
 * Agent exit point. Last code executed.
 */
 JNIEXPORT void JNICALL Agent_OnUnload(JavaVM *vm) {
   BLOCK_SAMPLE;
+  if (onload_flag) {
   JVM::shutdown();
   INFO("Agent_OnUnload\n");
+  }
   UNBLOCK_SAMPLE;
 }

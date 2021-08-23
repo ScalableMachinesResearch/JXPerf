@@ -34,6 +34,9 @@ interval_tree_node *splay_tree_root = NULL;
 static std::unordered_map<Context*, Context*> map = {};
 thread_local std::unordered_map<Context*, per_context_info_t> allocation_callback_ctxt={};
 uint32_t period = 10000;
+extern bool jni_flag;
+extern bool onload_flag;
+static SpinLock output_lock;
 
 uint64_t GCCounter = 0;
 thread_local uint64_t localGCCounter = 0;
@@ -798,6 +801,7 @@ void Profiler::init() {
 void Profiler::shutdown() {
     WP_Shutdown();
     PerfManager::processShutdown();
+    if(onload_flag) {
     ThreadData::thread_data_shutdown();
     output_statistics(); 
     _statistics_file.close();
@@ -805,6 +809,7 @@ void Profiler::shutdown() {
 #ifndef COUNT_OVERHEAD
     _method_file.close();
 #endif
+    }
 }
 
 void Profiler::IncrementGCCouter() {
@@ -863,15 +868,16 @@ void Profiler::threadStart() {
 
 void Profiler::threadEnd() {
     PerfManager::closeEvents();
-    if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0) {
-        WP_ThreadTerminate();
+    if (clientName.compare(DATA_CENTRIC_CLIENT_NAME) != 0 && jni_flag == false) {
+        // WP_ThreadTerminate();
     }
     ContextTree *ctxt_tree = reinterpret_cast<ContextTree *>(TD_GET(context_state));
-        
+   
 #ifndef COUNT_OVERHEAD    
     OUTPUT *output_stream = reinterpret_cast<OUTPUT *>(TD_GET(output_state));
     std::unordered_set<Context *> dump_ctxt = {};
     
+    if (ctxt_tree != nullptr) {
     for (auto elem : (*ctxt_tree)) {
         Context *ctxt_ptr = elem;
 
@@ -899,6 +905,7 @@ void Profiler::threadEnd() {
             }
         }
     }
+    }
     
     //clean up the output stream
     delete output_stream;
@@ -925,8 +932,9 @@ void Profiler::threadEnd() {
         }
     }
 
-    ThreadData::thread_data_dealloc();
+    // ThreadData::thread_data_dealloc();
 
+    if (onload_flag) {  //onload mode
     __sync_fetch_and_add(&grandTotWrittenBytes, totalWrittenBytes);
     __sync_fetch_and_add(&grandTotLoadedBytes, totalLoadedBytes);
     __sync_fetch_and_add(&grandTotUsedBytes, totalUsedBytes);
@@ -938,6 +946,27 @@ void Profiler::threadEnd() {
     __sync_fetch_and_add(&grandTotAllocTimes, totalAllocTimes);
     __sync_fetch_and_add(&grandTotSameValueTimes, totalSameValueTimes);
     __sync_fetch_and_add(&grandTotDiffValueTimes, totalDiffValueTimes);
+    } else {
+        output_lock.lock();
+        grandTotWrittenBytes += totalWrittenBytes;
+        grandTotLoadedBytes += totalLoadedBytes;
+        grandTotUsedBytes += totalUsedBytes;
+        grandTotDeadBytes += totalDeadBytes;
+        grandTotNewBytes += totalNewBytes;
+        grandTotOldBytes += totalOldBytes;
+        grandTotOldAppxBytes += totalOldAppxBytes;
+        grandTotAllocTimes += totalAllocTimes;
+        // grandTotSameNUMA += totalSameNUMA;
+        // grandTotDiffNUMA += totalDiffNUMA;
+        grandTotL1Cachemiss += totalL1Cachemiss;
+        grandTotSameValueTimes += totalSameValueTimes;
+        grandTotDiffValueTimes += totalDiffValueTimes;
+        // grandTotGenericCounter += totalGenericCounter;
+        // grandTotPMUCounter += totalPMUCounter;
+        _statistics_file.seekp(0,std::ios::beg);
+        output_statistics();
+        output_lock.unlock();
+    }
 }
 
 
@@ -968,7 +997,7 @@ void Profiler::output_statistics() {
         _statistics_file << grandTotAllocTimes << std::endl;
         _statistics_file << grandTotL1Cachemiss << std::endl;
     } else if (clientName.compare(OBJECT_LEVEL_CLIENT_NAME) == 0) {
-        _statistics_file << clientName << std::endl;
+        _statistics_file << clientName << " 8/22" << std::endl;
         _statistics_file << grandTotSameValueTimes << std::endl;
         _statistics_file << grandTotDiffValueTimes << std::endl;
     }
