@@ -126,9 +126,9 @@ class ContextManager:
 				temp_node = None
 			else:
 				if temp_node.getParentID() == "-1":
-					temp_node = None
+    					temp_node = None
 				else:
-					temp_node = self._id2context(temp_node.getParentID())
+    					temp_node = self._id2context(temp_node.getParentID())
 		return trace
 
 	def getAllRtrace(self, root_id):

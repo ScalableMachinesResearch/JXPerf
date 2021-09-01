@@ -427,6 +427,7 @@ def main():
                 file.write(row[0] + "\n\nReuse Distance: " + str(row[-1]) +"\n")
         file.write("\nTotal Memory Access Times: " + result[0])
     elif result and isObjLevel == True:
+        n = 1
         assert(len(result) == 2)
         totalEqualityTimes = int(result[0])
         totalInequalityTimes = int(result[1])
@@ -436,9 +437,11 @@ def main():
         for row in rows:
             equalityTimes = row[-1]
             inequalityTimes = 0
-            file.write(row[0] + "\n\nReplication Factor: " + str(float(equalityTimes) * 10000 / (totalEqualityTimes + totalInequalityTimes)) + "%\n")
-        file.write("\nTotal Equality Times: " + result[0])
-        file.write("\nTotal Inequality Times: " + result[1])
+            if n <= 5 and row[0][-1] != "*":
+                file.write(row[0] + "\n\nReplication Factor: " + str(float(equalityTimes) * 10000 / (totalEqualityTimes + totalInequalityTimes)) + "%\n")
+            # n += 1
+        # file.write("\nTotal Equality Times: " + result[0])
+        # file.write("\nTotal Inequality Times: " + result[1])
 
 
         # soot
